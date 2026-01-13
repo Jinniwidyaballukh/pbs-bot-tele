@@ -53,12 +53,12 @@ export default function AnalyticsPage() {
         date.setDate(date.getDate() - i)
         const dateStr = date.toISOString().split('T')[0]
 
-        const dayOrders = orders?.filter(o => {
+        const dayOrders = (orders || []).filter((o: any) => {
           const orderDate = new Date(o.created_at).toISOString().split('T')[0]
           return orderDate === dateStr && (o.status === 'paid' || o.status === 'completed')
-        }) || []
+        })
 
-        const dayRevenue = dayOrders.reduce((sum, o) => sum + o.total_price, 0)
+        const dayRevenue = dayOrders.reduce((sum: number, o: any) => sum + o.total_price, 0)
 
         data.push({
           date: new Date(dateStr).toLocaleDateString('id-ID', { month: 'short', day: 'numeric' }),
@@ -68,8 +68,8 @@ export default function AnalyticsPage() {
       }
 
       // Calculate stats
-      const paidOrders = orders?.filter(o => o.status === 'paid' || o.status === 'completed') || []
-      const totalRevenue = paidOrders.reduce((sum, o) => sum + o.total_price, 0)
+      const paidOrders = (orders || []).filter((o: any) => o.status === 'paid' || o.status === 'completed')
+      const totalRevenue = paidOrders.reduce((sum: number, o: any) => sum + o.total_price, 0)
       const avgOrderValue = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0
 
       setChartData(data)

@@ -14,7 +14,7 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Database['public']['Tables']['products']['Insert']>({
     kode: '',
     nama: '',
     harga: 0,
@@ -80,7 +80,7 @@ export default function ProductsPage() {
 
       if (error) throw error
       setProducts(products.filter(p => p.id !== id))
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting product:', error)
       alert('Failed to delete product')
     }
@@ -92,24 +92,24 @@ export default function ProductsPage() {
     try {
       if (editingProduct) {
         // Update
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from('products')
-          .update(formData)
+          .update(formData as any)
           .eq('id', editingProduct.id)
 
-        if (error) throw error
+        if (updateError) throw updateError
       } else {
         // Create
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from('products')
-          .insert([formData])
+          .insert([formData] as any)
 
-        if (error) throw error
+        if (insertError) throw insertError
       }
 
       await fetchProducts()
       setShowModal(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error)
       alert('Failed to save product')
     }
@@ -265,7 +265,7 @@ export default function ProductsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                 <input
                   type="text"
-                  value={formData.kategori}
+                  value={formData.kategori || ''}
                   onChange={(e) => setFormData({ ...formData, kategori: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
@@ -295,7 +295,7 @@ export default function ProductsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea
-                  value={formData.deskripsi}
+                  value={formData.deskripsi || ''}
                   onChange={(e) => setFormData({ ...formData, deskripsi: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"

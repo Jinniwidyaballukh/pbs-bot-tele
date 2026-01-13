@@ -31,12 +31,13 @@ export default function ProductItemsPage() {
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error: fetchError } = await supabase
         .from('products')
         .select('*')
         .order('nama')
+        .returns<Product[]>()
 
-      if (error) throw error
+      if (fetchError) throw fetchError
       setProducts(data || [])
       if (data && data.length > 0) {
         setSelectedProduct(data[0].kode)
@@ -50,13 +51,13 @@ export default function ProductItemsPage() {
 
   const fetchItems = async (productCode: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error: fetchError } = await supabase
         .from('product_items')
         .select('*')
         .eq('product_code', productCode)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (fetchError) throw fetchError
       setItems(data || [])
     } catch (error) {
       console.error('Error fetching items:', error)
@@ -87,17 +88,17 @@ export default function ProductItemsPage() {
         status: 'available' as const,
       }))
 
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('product_items')
-        .insert(itemsToInsert)
+        .insert(itemsToInsert as any)
 
-      if (error) throw error
+      if (insertError) throw insertError
 
       setNewItems('')
       setShowAddModal(false)
       await fetchItems(selectedProduct)
       alert(`Successfully added ${itemLines.length} items!`)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding items:', error)
       alert('Failed to add items')
     }
@@ -107,14 +108,14 @@ export default function ProductItemsPage() {
     if (!confirm('Are you sure you want to delete this item?')) return
 
     try {
-      const { error } = await supabase
+      const { error: deleteError } = await supabase
         .from('product_items')
         .delete()
         .eq('id', id)
 
-      if (error) throw error
+      if (deleteError) throw deleteError
       setItems(items.filter(i => i.id !== id))
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting item:', error)
       alert('Failed to delete item')
     }

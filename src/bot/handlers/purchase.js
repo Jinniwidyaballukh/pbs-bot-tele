@@ -242,6 +242,9 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
     // Kirim pesan 1
     await telegram.sendMessage(order.chatId, message1, { parse_mode: 'Markdown' });
     
+    // Delay 500ms agar pesan terpisah dengan jelas
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     // ============================================
     // PESAN 2: ITEM YANG DIPESAN (PRODUK DIGITAL)
     // ============================================
@@ -264,6 +267,9 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
       
       // Kirim pesan 2
       await telegram.sendMessage(order.chatId, message2, { parse_mode: 'Markdown' });
+      
+      // Delay 500ms sebelum pesan 3
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     
     // ============================================

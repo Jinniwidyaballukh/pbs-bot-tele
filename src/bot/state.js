@@ -129,33 +129,43 @@ export function recordSearchQuery(query) {
  * Record order
  */
 export function recordOrder(orderId, userId, amount, productCode) {
-  ANALYTICS.totalOrders++;
-  ANALYTICS.totalRevenue += amount;
-  
-  // Update daily stats
-  const today = new Date().toISOString().split('T')[0];
-  if (!ANALYTICS.dailyStats.has(today)) {
-    ANALYTICS.dailyStats.set(today, { orders: 0, revenue: 0, products: new Map() });
+  try {
+    ANALYTICS.totalOrders++;
+    ANALYTICS.totalRevenue += amount;
+    
+    // Update daily stats
+    const today = new Date().toISOString().split('T')[0];
+    if (!ANALYTICS.dailyStats.has(today)) {
+      ANALYTICS.dailyStats.set(today, { orders: 0, revenue: 0, products: new Map() });
+    }
+    
+    const dailyStat = ANALYTICS.dailyStats.get(today);
+    dailyStat.orders++;
+    dailyStat.revenue += amount;
+    
+    // Ensure products is a Map
+    if (!dailyStat.products || !(dailyStat.products instanceof Map)) {
+      dailyStat.products = new Map();
+    }
+    
+    const productCount = dailyStat.products.get(productCode) || 0;
+    dailyStat.products.set(productCode, productCount + 1);
+    
+    // Add to user history
+    if (!PURCHASE_HISTORY.has(userId)) {
+      PURCHASE_HISTORY.set(userId, []);
+    }
+    
+    PURCHASE_HISTORY.get(userId).push({
+      orderId,
+      productCode,
+      amount,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('[RECORD ORDER ERROR]', error);
+    // Continue anyway, analytics not critical
   }
-  
-  const dailyStat = ANALYTICS.dailyStats.get(today);
-  dailyStat.orders++;
-  dailyStat.revenue += amount;
-  
-  const productCount = dailyStat.products.get(productCode) || 0;
-  dailyStat.products.set(productCode, productCount + 1);
-  
-  // Add to user history
-  if (!PURCHASE_HISTORY.has(userId)) {
-    PURCHASE_HISTORY.set(userId, []);
-  }
-  
-  PURCHASE_HISTORY.get(userId).push({
-    orderId,
-    productCode,
-    amount,
-    timestamp: Date.now(),
-  });
 }
 
 /**

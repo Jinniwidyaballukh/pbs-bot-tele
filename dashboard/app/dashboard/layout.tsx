@@ -10,7 +10,7 @@ import {
   FiHome, 
   FiBox, 
   FiShoppingCart, 
-  FiBarChart3, 
+  FiBarChart, 
   FiSettings, 
   FiLogOut, 
   FiPackage,
@@ -23,7 +23,7 @@ const navItems = [
   { name: 'Product Items', href: '/dashboard/items', icon: FiPackage },
   { name: 'Orders', href: '/dashboard/orders', icon: FiShoppingCart },
   { name: 'Users', href: '/dashboard/users', icon: FiUsers },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: FiBarChart3 },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: FiBarChart },
   { name: 'Settings', href: '/dashboard/settings', icon: FiSettings },
 ]
 

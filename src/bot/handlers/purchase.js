@@ -5,7 +5,7 @@ import { ACTIVE_ORDERS, recordOrder, getUserSession } from '../state.js';
 import { formatProductDetail, formatPendingPayment, formatOrderReceipt, formatCurrency, formatDateTime } from '../formatters.js';
 import { productDetailKeyboard, orderStatusKeyboard } from '../keyboards.js';
 import { byKode, getAll as getAllProducts } from '../../data/products.js';
-import { reserveStock, finalizeStock, releaseStock } from '../../services/gas.js';
+import { reserveStock, finalizeStock, releaseStock } from '../../database/stock.js';
 import { createMidtransQRISCharge, midtransStatus } from '../../payments/midtrans.js';
 
 /**
@@ -47,22 +47,28 @@ export async function handlePurchase(ctx, productCode, quantity = 1) {
   const processingMsg = await ctx.reply('⏳ Memproses pesanan Anda...');
   
   try {
+    // Generate unique order ID
+    const timestamp = Date.now();
+    const orderId = `ORD-${timestamp}-${userId}`;
+    
     // Step 1: Reserve stock
     const reserveResult = await reserveStock({
+      order_id: orderId,
       kode: productCode,
       qty: quantity,
       userRef,
     });
     
-    if (!reserveResult?.ok || !reserveResult?.order_id) {
+    if (!reserveResult?.ok) {
       await ctx.telegram.deleteMessage(ctx.chat.id, processingMsg.message_id);
-      return ctx.reply(
-        `❌ Gagal memesan produk: ${reserveResult?.msg || 'Stok tidak tersedia'}\n\n` +
-        `Silakan coba lagi atau hubungi admin.`
-      );
+      
+      const errorMsg = reserveResult?.msg === 'insufficient_stock' && reserveResult?.available !== undefined
+        ? `❌ Stok tidak cukup!\n\nStok tersedia: ${reserveResult.available}\nAnda minta: ${quantity}`
+        : `❌ Gagal memesan produk: ${reserveResult?.msg || 'Stok tidak tersedia'}\n\nSilakan coba lagi atau hubungi admin.`;
+      
+      return ctx.reply(errorMsg);
     }
     
-    const orderId = String(reserveResult.order_id);
     const unitPrice = Number(product.harga) || 0;
     const totalAmount = unitPrice * quantity;
     

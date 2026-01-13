@@ -1,5 +1,14 @@
 // src/data/products.js
-import { parse } from 'csv-parse/sync';
+// Product data layer with Supabase + caching
+
+import { 
+  getAllProducts as dbGetAllProducts,
+  getProductByCode as dbGetProductByCode,
+  searchProducts as dbSearchProducts,
+  getProductsByCategory as dbGetProductsByCategory,
+  getAllCategories as dbGetAllCategories,
+} from '../database/products.js';
+import { logger } from '../utils/logger.js';
 
 // Import config
 let BOT_CONFIG;
@@ -7,16 +16,16 @@ try {
   const module = await import('../bot/config.js');
   BOT_CONFIG = module.BOT_CONFIG;
 } catch {
-  // Fallback
   BOT_CONFIG = {
-    SHEET_URL: process.env.SHEET_URL || '',
-    PRODUCT_TTL_MS: Number(process.env.PRODUCT_TTL_MS) || 120000,
+    PRODUCT_TTL_MS: Number(process.env.PRODUCT_TTL_MS) || 300000, // 5 minutes
   };
 }
 
+// In-memory cache
 let PRODUCTS = [];
 let LAST_LOAD = 0;
 let PRODUCT_TOKENS = new Set();
+let CATEGORIES_CACHE = [];
 
 /**
  * Normalize text for searching
@@ -25,38 +34,12 @@ const norm = (s) => String(s || '').toLowerCase().trim();
 const normCode = (s) => norm(s).replace(/[^a-z0-9]/g, '');
 
 /**
- * Convert row to product object
- */
-const lowerify = (r) => {
-  const o = {};
-  for (const k of Object.keys(r)) {
-    o[k.trim().toLowerCase()] = (r[k] ?? '').toString().trim();
-  }
-  return o;
-};
-
-export function rowToProduct(r) {
-  const o = lowerify(r);
-  return {
-    nama: o.nama || '',
-    harga: o.harga || '',
-    ikon: o.ikon || '',
-    deskripsi: o.deskripsi || '',
-    kategori: o.kategori || '',
-    wa: o.wa || '',
-    harga_lama: o.harga_lama || '',
-    stok: o.stok || '',
-    kode: o.kode || '',
-    alias: o.alias || '',
-    terjual: o.terjual || '',
-    total: o.total || '',
-  };
-}
-
-/**
  * Split aliases
  */
 export function splitAliases(s = '') {
+  if (!s) return [];
+  if (Array.isArray(s)) return s;
+  
   return String(s)
     .split(/[\n,;|/]+/g)
     .map(t => t.trim())
@@ -64,13 +47,16 @@ export function splitAliases(s = '') {
 }
 
 /**
- * Build search tokens
+ * Build search tokens from products
  */
 export function buildProductTokens() {
   const tokens = new Set();
+  
   for (const p of PRODUCTS) {
+    // Add code
     if (p.kode) tokens.add(norm(p.kode));
     
+    // Add words from name
     String(p.nama || '')
       .toLowerCase()
       .split(/[^a-z0-9]+/i)
@@ -78,84 +64,69 @@ export function buildProductTokens() {
       .filter(w => w && w.length >= 3)
       .forEach(w => tokens.add(w));
     
-    splitAliases(p.alias).forEach(w => {
+    // Add aliases
+    const aliases = splitAliases(p.alias);
+    aliases.forEach(w => {
       w.split(/[^a-z0-9]+/i)
         .filter(x => x && x.length >= 3)
         .forEach(x => tokens.add(x.toLowerCase()));
     });
   }
+  
   PRODUCT_TOKENS = tokens;
-  console.log(`[PRODUCTS] Built ${tokens.size} search tokens`);
+  logger.info(`Built ${tokens.size} search tokens from ${PRODUCTS.length} products`);
 }
 
 /**
- * Load products from Google Sheets
+ * Load products from Supabase (with caching)
  */
 export async function loadProducts(force = false) {
   const now = Date.now();
   const stale = (now - LAST_LOAD) > BOT_CONFIG.PRODUCT_TTL_MS;
   
   if (!force && PRODUCTS.length && !stale) {
-    console.log('[PRODUCTS] Using cached data');
-    return PRODUCTS;
-  }
-
-  if (!BOT_CONFIG.SHEET_URL) {
-    console.warn('[PRODUCTS] SHEET_URL not configured, using dummy data');
-    PRODUCTS = [
-      {
-        nama: 'Contoh Produk',
-        harga: '10000',
-        kode: 'DEMO1',
-        alias: 'sample, demo',
-        kategori: 'Demo',
-        deskripsi: 'Produk contoh untuk testing',
-        stok: '999',
-      },
-    ];
-    LAST_LOAD = now;
-    buildProductTokens();
+    logger.info('Using cached products');
     return PRODUCTS;
   }
 
   try {
-    console.log('[PRODUCTS] Loading from sheet...');
+    logger.info('Loading products from Supabase...');
     
-    // Add cache-buster and no-cache headers
-    const url = `${BOT_CONFIG.SHEET_URL}${BOT_CONFIG.SHEET_URL.includes('?') ? '&' : '?'}t=${now}`;
+    const products = await dbGetAllProducts();
     
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const csv = await response.text();
-    const rows = parse(csv, { columns: true, skip_empty_lines: true });
-
-    PRODUCTS = rows
-      .map(rowToProduct)
-      .filter(p => p.nama && p.kode);
+    PRODUCTS = products.map(p => ({
+      // Supabase fields
+      id: p.id,
+      kode: p.kode || '',
+      nama: p.nama || '',
+      kategori: p.kategori || '',
+      harga: String(p.harga || '0'),
+      harga_lama: p.harga_lama ? String(p.harga_lama) : '',
+      stok: String(p.stok || '0'),
+      ikon: p.ikon || '',
+      deskripsi: p.deskripsi || '',
+      wa: p.wa || '',
+      alias: p.alias || [],
+      aktif: p.aktif,
+      created_at: p.created_at,
+      updated_at: p.updated_at,
+      // Legacy fields for compatibility
+      terjual: '',
+      total: '',
+    }));
 
     LAST_LOAD = now;
     buildProductTokens();
 
-    console.log(`[PRODUCTS] Loaded ${PRODUCTS.length} products`);
+    logger.info(`✅ Loaded ${PRODUCTS.length} products from Supabase`);
     return PRODUCTS;
     
   } catch (error) {
-    console.error('[PRODUCTS] Load error:', error.message);
+    logger.error('Failed to load products from Supabase:', { error: error.message });
     
     // If we have cached data, use it
     if (PRODUCTS.length > 0) {
-      console.warn('[PRODUCTS] Using stale cache due to error');
+      logger.warn('⚠️ Using stale cache due to error');
       return PRODUCTS;
     }
     
@@ -166,58 +137,161 @@ export async function loadProducts(force = false) {
 /**
  * Get all categories
  */
-export const categories = () => {
-  const cats = [...new Set(PRODUCTS.map(p => p.kategori).filter(Boolean))];
-  return cats.sort((a, b) => a.localeCompare(b));
-};
+export async function categories() {
+  try {
+    // Return from cache if available
+    if (CATEGORIES_CACHE.length > 0 && PRODUCTS.length > 0) {
+      return CATEGORIES_CACHE;
+    }
+    
+    const cats = await dbGetAllCategories();
+    CATEGORIES_CACHE = cats;
+    return cats;
+  } catch (error) {
+    logger.error('Failed to get categories:', { error: error.message });
+    
+    // Fallback to local cache
+    const localCats = [...new Set(PRODUCTS.map(p => p.kategori).filter(Boolean))];
+    return localCats.sort();
+  }
+}
 
 /**
- * Search products
+ * Search products (local cache + fuzzy matching)
  */
-export const searchProducts = (q) => {
+export function searchProducts(q) {
   const s = norm(q);
-  return PRODUCTS.filter(p => 
-    [p.nama, p.deskripsi, p.kode, p.kategori, p.alias].some(v => norm(v).includes(s))
-  );
-};
+  
+  // Search in cached products
+  return PRODUCTS.filter(p => {
+    const fields = [
+      p.nama,
+      p.deskripsi,
+      p.kode,
+      p.kategori,
+      ...(Array.isArray(p.alias) ? p.alias : splitAliases(p.alias))
+    ];
+    
+    return fields.some(v => norm(v).includes(s));
+  });
+}
 
 /**
- * Get product by code
+ * Search products in database (for advanced search)
  */
-export const byKode = (code) => {
+export async function searchProductsDB(query) {
+  try {
+    const results = await dbSearchProducts(query);
+    return results;
+  } catch (error) {
+    logger.error('Database search failed, using local:', { error: error.message });
+    return searchProducts(query);
+  }
+}
+
+/**
+ * Get product by code (check cache first)
+ */
+export function byKode(code) {
   const c = normCode(code);
+  
   return PRODUCTS.find(p => {
+    // Check main code
     if (normCode(p.kode) === c) return true;
-    const aliases = splitAliases(p.alias);
+    
+    // Check aliases
+    const aliases = Array.isArray(p.alias) ? p.alias : splitAliases(p.alias);
     return aliases.some(a => normCode(a) === c);
   });
-};
+}
 
 /**
- * Get all products
+ * Get product by code from database
  */
-export const getAll = () => PRODUCTS;
+export async function byKodeDB(code) {
+  try {
+    const product = await dbGetProductByCode(code);
+    return product;
+  } catch (error) {
+    logger.error('Failed to get product from DB:', { code, error: error.message });
+    return byKode(code);
+  }
+}
+
+/**
+ * Get all products (from cache)
+ */
+export function getAll() {
+  return PRODUCTS;
+}
 
 /**
  * Get search tokens
  */
-export const getTokens = () => PRODUCT_TOKENS;
+export function getTokens() {
+  return PRODUCT_TOKENS;
+}
 
 /**
- * Get products by category
+ * Get products by category (from cache)
  */
-export const byCategory = (category) => {
+export function byCategory(category) {
   return PRODUCTS.filter(p => norm(p.kategori) === norm(category));
-};
+}
+
+/**
+ * Get products by category from database
+ */
+export async function byCategoryDB(category) {
+  try {
+    const products = await dbGetProductsByCategory(category);
+    return products;
+  } catch (error) {
+    logger.error('Failed to get category from DB:', { category, error: error.message });
+    return byCategory(category);
+  }
+}
 
 /**
  * Get product statistics
  */
-export const getStats = () => {
+export function getStats() {
   return {
     total: PRODUCTS.length,
-    categories: categories().length,
+    categories: [...new Set(PRODUCTS.map(p => p.kategori).filter(Boolean))].length,
     lastUpdate: new Date(LAST_LOAD).toISOString(),
     tokens: PRODUCT_TOKENS.size,
+    cacheAge: Date.now() - LAST_LOAD,
   };
-};
+}
+
+/**
+ * Clear cache (force reload next time)
+ */
+export function clearCache() {
+  PRODUCTS = [];
+  LAST_LOAD = 0;
+  PRODUCT_TOKENS = new Set();
+  CATEGORIES_CACHE = [];
+  logger.info('Product cache cleared');
+}
+
+/**
+ * Legacy function for backward compatibility
+ */
+export function rowToProduct(r) {
+  return {
+    nama: r.nama || '',
+    harga: r.harga || '',
+    ikon: r.ikon || '',
+    deskripsi: r.deskripsi || '',
+    kategori: r.kategori || '',
+    wa: r.wa || '',
+    harga_lama: r.harga_lama || '',
+    stok: r.stok || '',
+    kode: r.kode || '',
+    alias: r.alias || '',
+    terjual: r.terjual || '',
+    total: r.total || '',
+  };
+}

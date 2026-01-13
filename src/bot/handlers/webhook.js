@@ -3,7 +3,7 @@ import { handlePaymentSuccess } from './purchase.js';
 import { BOT_CONFIG } from '../config.js';
 import { verifyMidtransSignature } from '../../payments/midtrans.js';
 import { loadProducts } from '../../data/products.js';
-import { finalizeStock, releaseStock } from '../../services/gas.js';
+import { finalizeStock, releaseStock } from '../../database/stock.js';
 import { ACTIVE_ORDERS } from '../state.js';
 import { logger } from '../../utils/logger.js';
 import { metrics, MetricNames } from '../../utils/metrics.js';

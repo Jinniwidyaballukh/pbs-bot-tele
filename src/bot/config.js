@@ -16,13 +16,17 @@ export const BOT_CONFIG = {
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
   TELEGRAM_ADMIN_IDS: (process.env.TELEGRAM_ADMIN_IDS || '').split(',').map(id => Number(id.trim())).filter(Boolean),
   
-  // Google Sheets
+  // Supabase Database
+  SUPABASE_URL: process.env.SUPABASE_URL || '',
+  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
+  
+  // Legacy Google Sheets (optional for migration/backup)
   SHEET_URL: process.env.SHEET_URL || '',
   SHEET_URL_PROMO: process.env.SHEET_URL_PROMO || '',
   SHEET_URL_PAYMENT: process.env.SHEET_URL_PAYMENT || '',
-  PRODUCT_TTL_MS: num(process.env.PRODUCT_TTL_MS, 2 * 60 * 1000), // 2 minutes default
+  PRODUCT_TTL_MS: num(process.env.PRODUCT_TTL_MS, 5 * 60 * 1000), // 5 minutes cache
   
-  // Google Apps Script
+  // Legacy Google Apps Script (deprecated)
   GAS_URL: process.env.GAS_WEBHOOK_URL || '',
   GAS_SECRET: process.env.GAS_SECRET || '',
   
@@ -68,12 +72,12 @@ export function validateConfig() {
     errors.push('TELEGRAM_BOT_TOKEN is required');
   }
   
-  if (!BOT_CONFIG.SHEET_URL) {
-    errors.push('SHEET_URL is required for products');
+  if (!BOT_CONFIG.SUPABASE_URL) {
+    errors.push('SUPABASE_URL is required');
   }
   
-  if (!BOT_CONFIG.GAS_URL) {
-    errors.push('GAS_WEBHOOK_URL is required for stock management');
+  if (!BOT_CONFIG.SUPABASE_ANON_KEY) {
+    errors.push('SUPABASE_ANON_KEY is required');
   }
   
   if (!BOT_CONFIG.MIDTRANS_SERVER_KEY) {

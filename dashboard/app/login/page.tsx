@@ -89,21 +89,33 @@ export default function LoginPage() {
 
       console.log('✅ Session created successfully')
       console.log('👤 User ID:', data.user?.id)
+      console.log('🔐 Session:', {
+        accessToken: data.session.access_token ? '✅ Set' : '❌ Missing',
+        refreshToken: data.session.refresh_token ? '✅ Set' : '❌ Missing',
+        expiresIn: data.session.expires_in,
+      })
+      
+      // Wait a moment for cookies to be fully set by auth-helpers
+      await new Promise(resolve => setTimeout(resolve, 1000))
       
       const cookies = document.cookie.split(';').map(c => c.trim())
       const authCookies = cookies.filter(c => c.includes('sb-'))
       console.log('🍪 Auth cookies found:', authCookies.length)
+      console.log('🍪 All cookies:', cookies)
+      
+      // Verify session was persisted
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log('🔍 Verified session after login:', session ? '✅ Session exists' : '❌ No session')
       
       console.log('🔄 Preparing redirect to dashboard...')
-      
-      await new Promise(resolve => setTimeout(resolve, 500))
       
       console.log('✅ Redirecting to /dashboard...')
       router.push('/dashboard')
       
+      // Refresh after a short delay to ensure middleware checks new auth state
       setTimeout(() => {
         router.refresh()
-      }, 1000)
+      }, 500)
       
       console.log('🔐 ========== LOGIN SUCCESS ==========')
       

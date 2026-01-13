@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-  // Supabase stores auth tokens in cookies with this pattern
+  // Get Supabase auth cookie to check if user is authenticated
+  // Auth-helpers now properly persists these cookies automatically
   const supabaseAuthCookie = request.cookies.getAll().find(cookie => 
     cookie.name.includes('sb-') && cookie.name.includes('-auth-token')
   )

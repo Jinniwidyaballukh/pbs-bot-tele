@@ -242,8 +242,8 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
     // Kirim pesan 1
     await telegram.sendMessage(order.chatId, message1, { parse_mode: 'Markdown' });
     
-    // Delay 500ms agar pesan terpisah dengan jelas
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Delay 1000ms agar pesan terpisah dengan jelas
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // ============================================
     // PESAN 2: ITEM YANG DIPESAN (PRODUK DIGITAL)
@@ -252,14 +252,19 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
     if (finalizeResult?.items && finalizeResult.items.length > 0) {
       const itemLines = [
         '🎁 *PRODUK DIGITAL ANDA:*',
+        '━━━━━━━━━━━━━━━━━━━━',
         ''
       ];
       
       finalizeResult.items.forEach((item, i) => {
-        itemLines.push(`📦 *Item ${i + 1}*`);
+        itemLines.push(`📦 *Item ${i + 1}* - \`${item?.kode || 'N/A'}\``);
         const details = String(item.data || '').split('||').filter(Boolean);
-        details.forEach(detail => itemLines.push(`   ${detail.trim()}`));
-        if (i < finalizeResult.items.length - 1) itemLines.push('');
+        details.forEach(detail => {
+          itemLines.push(`   📌 ${detail.trim()}`);
+        });
+        if (i < finalizeResult.items.length - 1) {
+          itemLines.push('');
+        }
       });
       
       itemLines.push('', '━━━━━━━━━━━━━━━━━━━━');
@@ -268,29 +273,35 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
       // Kirim pesan 2
       await telegram.sendMessage(order.chatId, message2, { parse_mode: 'Markdown' });
       
-      // Delay 500ms sebelum pesan 3
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Delay 1000ms sebelum pesan 3
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
     // ============================================
     // PESAN 3: TEMPLATE AKHIR & UCAPAN TERIMA KASIH
     // ============================================
     const message3Lines = [
-      '✨ *Terima kasih sudah berbelanja!*',
-      '⭐️ Simpan pesanan ini sebagai bukti pembelian',
+      '',
+      '✨ *Terima Kasih Sudah Berbelanja!*',
+      '━━━━━━━━━━━━━━━━━━━━',
+      '',
+      '⭐️ *Simpan pesanan ini sebagai bukti pembelian*',
+      '',
     ];
     
     // Tambah catatan jika ada
     if (finalizeResult?.after_msg) {
-      message3Lines.push('');
-      message3Lines.push('📌 *Catatan:*');
+      message3Lines.push('📌 *Catatan Penting:*');
       message3Lines.push(finalizeResult.after_msg);
+      message3Lines.push('');
     }
     
     // Tambah contact support
     if (BOT_CONFIG.SUPPORT_CONTACT) {
+      message3Lines.push('━━━━━━━━━━━━━━━━━━━━');
       message3Lines.push('');
-      message3Lines.push(`📞 Bantuan: ${BOT_CONFIG.SUPPORT_CONTACT}`);
+      message3Lines.push(`📞 *Butuh Bantuan?*`);
+      message3Lines.push(`Hubungi: ${BOT_CONFIG.SUPPORT_CONTACT}`);
     }
     
     const message3 = message3Lines.join('\n');
@@ -303,6 +314,31 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
     
     // Update order status
     order.status = 'completed';
+    
+    // Auto-refresh stok setelah pembayaran sukses (non-blocking)
+    // Ini akan update stok di sheet dan notify bot
+    try {
+      const { logger } = await import('../../utils/logger.js');
+      logger.info(`[AUTO REFRESH] Triggering refresh after payment ${orderId}`);
+      
+      // Call webhook untuk refresh produk
+      const response = await fetch('http://localhost:3000/admin/reload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: 'supersecret-bot',
+          what: 'produk',
+          note: `payment_success_${orderId}`
+        })
+      }).catch(() => null);
+      
+      if (response?.ok) {
+        console.log(`[AUTO REFRESH] ✅ Stok berhasil di-refresh untuk order ${orderId}`);
+      }
+    } catch (refreshErr) {
+      console.warn(`[AUTO REFRESH] Could not refresh stok:`, refreshErr.message);
+      // Continue anyway
+    }
     
     // Clean up after 1 hour
     setTimeout(() => {

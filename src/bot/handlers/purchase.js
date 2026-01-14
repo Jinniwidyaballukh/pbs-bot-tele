@@ -102,7 +102,7 @@ export async function handlePurchase(ctx, productCode, quantity = 1) {
 
       await createOrder({
         order_id: orderId,
-        user_id: String(userId),
+        user_id: userId,  // Keep as number (BIGINT)
         total_amount: totalAmount,
         payment_url: chargeResult.qr_url || null,
         midtrans_token: null,
@@ -225,6 +225,8 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
   }
   
   try {
+    console.log(`[PAYMENT SUCCESS] ✅ Processing payment untuk ${orderId}`);
+    
     // Delete QR code message
     if (order.qrMessageId) {
       try {
@@ -233,6 +235,7 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
     }
     
     // Finalize stock and get digital items
+    console.log(`[PAYMENT SUCCESS] 📦 Finalizing stock untuk ${orderId}...`);
     const finalizeResult = await finalizeStock({
       order_id: orderId,
       total: order.total,
@@ -244,9 +247,13 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
     console.log(`[FINALIZE DEBUG] Result:`, JSON.stringify(finalizeResult, null, 2));
     console.log(`[FINALIZE DEBUG] Items count:`, finalizeResult?.items?.length || 0);
     
+    if (!finalizeResult?.ok) {
+      console.error(`[FINALIZE ERROR] ⚠️ Finalize gagal: ${finalizeResult?.msg}`);
+    }
+    
     if (!finalizeResult?.items || finalizeResult.items.length === 0) {
       console.error(`[FINALIZE ERROR] ⚠️ No items returned for order ${orderId}!`);
-      console.error('[FINALIZE ERROR] Check Google Apps Script finalize action');
+      console.error('[FINALIZE ERROR] Check if product_items table has available items');
     }
     
     // ============================================

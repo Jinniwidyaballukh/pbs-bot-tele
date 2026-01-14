@@ -61,6 +61,7 @@ export async function handleMidtransWebhook(req, res, telegram) {
     
     // Handle different transaction statuses
     if (transactionStatus === 'settlement' || transactionStatus === 'capture') {
+      logger.info(`[WEBHOOK] ✅ Payment SUCCESS untuk ${orderId}, calling handlePaymentSuccess`);
       await handlePaymentSuccess(telegram, orderId, body);
       endTimer();
       return res.json({ success: true, message: 'Payment processed' });

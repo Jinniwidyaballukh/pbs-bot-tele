@@ -19,16 +19,7 @@ export const BOT_CONFIG = {
   // Supabase Database
   SUPABASE_URL: process.env.SUPABASE_URL || '',
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
-  
-  // Legacy Google Sheets (optional for migration/backup)
-  SHEET_URL: process.env.SHEET_URL || '',
-  SHEET_URL_PROMO: process.env.SHEET_URL_PROMO || '',
-  SHEET_URL_PAYMENT: process.env.SHEET_URL_PAYMENT || '',
   PRODUCT_TTL_MS: num(process.env.PRODUCT_TTL_MS, 5 * 60 * 1000), // 5 minutes cache
-  
-  // Legacy Google Apps Script (deprecated)
-  GAS_URL: process.env.GAS_WEBHOOK_URL || '',
-  GAS_SECRET: process.env.GAS_SECRET || '',
   
   // Midtrans
   MIDTRANS_SERVER_KEY: process.env.MIDTRANS_SERVER_KEY || '',

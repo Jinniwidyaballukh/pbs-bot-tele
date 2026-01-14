@@ -6,15 +6,10 @@ const bool = (v, def=false) => {
 };
 
 export const ENV = {
-  SHEET_URL: process.env.SHEET_URL || '',
-  SHEET_URL_PROMO: process.env.SHEET_URL_PROMO || '',
   ADMIN_JIDS: new Set((process.env.ADMINS || '').split(',').map(s=>s.trim()).filter(Boolean)),
   ADMIN_CONTACT: process.env.ADMIN_CONTACT || '',
   CLIENT_ID: process.env.CLIENT_ID || 'botwa-local',
   PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL || '',
-  GAS_URL: process.env.GAS_WEBHOOK_URL || '',
-  SHEET_URL_PAYMENT: process.env.SHEET_URL_PAYMENT || '',
-  GAS_SECRET: process.env.GAS_SECRET || '',
   PAY_PROV: (process.env.PAYMENT_PROVIDER || 'midtrans').toLowerCase(),
   MID_SKEY: process.env.MIDTRANS_SERVER_KEY || '',
   MID_PROD: bool(process.env.MIDTRANS_IS_PRODUCTION, true),

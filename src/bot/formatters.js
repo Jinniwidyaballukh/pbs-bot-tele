@@ -275,6 +275,104 @@ export function formatPendingPayment(order) {
 }
 
 /**
+ * Format payment success
+ */
+export function formatPaymentSuccess(order, paymentData = null) {
+  const blocks = [];
+
+  blocks.push(
+    cardBlock([
+      '✅ PEMBAYARAN BERHASIL',
+    ])
+  );
+
+  blocks.push(
+    cardBlock([
+      'Detail Pesanan',
+      kv('Order', `\`${order.orderId}\``),
+      kv('Produk', `*${order.productName}*`),
+      kv('Kode', `\`${order.productCode}\``),
+      kv('Jumlah', `${order.quantity} item`),
+    ])
+  );
+
+  blocks.push(
+    cardBlock([
+      'Rincian Biaya',
+      `Harga @ ${formatCurrency(order.unitPrice)}`,
+      `Total: *${formatCurrency(order.total)}*`,
+      kv('Metode', paymentData?.payment_type || 'QRIS'),
+      kv('Waktu', formatDateTime(order.createdAt || Date.now())),
+    ])
+  );
+
+  return blocks.join('\n\n');
+}
+
+/**
+ * Format digital items
+ */
+export function formatDigitalItems(items) {
+  if (!items || items.length === 0) {
+    return cardBlock(['Produk Digital Anda', '', 'Tidak ada item.']);
+  }
+
+  const itemLines = ['🎁 Produk Digital Anda'];
+  
+  items.forEach((item) => {
+    const detailsRaw = item.item_data || item.data || '';
+    const details = String(detailsRaw).split('||').filter(Boolean);
+    details.forEach(detail => {
+      itemLines.push(detail.trim());
+    });
+  });
+
+  return cardBlock(itemLines);
+}
+
+/**
+ * Format product notes
+ */
+export function formatProductNotes(notes) {
+  if (!notes || notes.length === 0) {
+    return '';
+  }
+
+  const noteLines = ['📝 Catatan Produk', ''];
+  
+  notes.forEach((note, idx) => {
+    if (notes.length > 1) {
+      noteLines.push(`${idx + 1}. ${note}`);
+    } else {
+      noteLines.push(note);
+    }
+  });
+
+  return cardBlock(noteLines);
+}
+
+/**
+ * Format thank you message
+ */
+export function formatThankYou(afterMsg = null, supportContact = null) {
+  const lines = [
+    '✨ Terima Kasih Sudah Berbelanja!',
+    '',
+    '⭐️ Simpan pesanan ini sebagai bukti pembelian',
+  ];
+
+  if (afterMsg) {
+    lines.push('', '📌 Catatan Penting:', afterMsg);
+  }
+
+  if (supportContact) {
+    lines.push('', '📞 Butuh Bantuan?', `Hubungi: ${supportContact}`);
+  }
+
+  return cardBlock(lines);
+}
+
+/**
  * Format search results
  */
 export function formatSearchResults(products, query) {

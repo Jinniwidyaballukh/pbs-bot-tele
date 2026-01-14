@@ -2,7 +2,7 @@
 import QRCode from 'qrcode';
 import { BOT_CONFIG } from '../config.js';
 import { ACTIVE_ORDERS, recordOrder, getUserSession } from '../state.js';
-import { formatProductDetail, formatPendingPayment, formatOrderReceipt, formatCurrency, formatDateTime } from '../formatters.js';
+import { formatProductDetail, formatPendingPayment, formatOrderReceipt, formatCurrency, formatDateTime, formatPaymentSuccess, formatDigitalItems, formatProductNotes, formatThankYou } from '../formatters.js';
 import { productDetailKeyboard, orderStatusKeyboard } from '../keyboards.js';
 import { byKode, getAll as getAllProducts } from '../../data/products.js';
 import { reserveStock, finalizeStock, releaseStock } from '../../database/stock.js';
@@ -262,24 +262,7 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
     // ============================================
     // PESAN 1: DETAIL PESANAN & RINCIAN BIAYA
     // ============================================
-    const message1 = [
-      '✅ *PEMBAYARAN BERHASIL*',
-      '━━━━━━━━━━━━━━━━━━━━',
-      '',
-      '📋 *Detail Pesanan:*',
-      `🆔 Order: \`${orderId}\``,
-      `📦 Produk: *${order.productName}*`,
-      `🔖 Kode: \`${order.productCode}\``,
-      `📊 Jumlah: ${order.quantity} item`,
-      '',
-      '💰 *Rincian Biaya:*',
-      `Harga @ ${formatCurrency(order.unitPrice)}`,
-      `Total: *${formatCurrency(order.total)}*`,
-      '',
-      `💳 ${paymentData?.payment_type || 'QRIS'}`,
-      `🕒 ${formatDateTime(order.createdAt || Date.now())}`,
-      '━━━━━━━━━━━━━━━━━━━━'
-    ].join('\n');
+    const message1 = formatPaymentSuccess(order, paymentData);
     
     // Kirim pesan 1
     await telegram.sendMessage(order.chatId, message1, { parse_mode: 'Markdown' });
@@ -314,22 +297,7 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
         );
       } else {
         // Kirim pesan 2 dalam satu blok untuk item <= 5
-        const itemLines = [
-          '🎁 *PRODUK DIGITAL ANDA:*',
-          '━━━━━━━━━━━━━━━━━━━━',
-          ''
-        ];
-        
-        items.forEach((item) => {
-          const detailsRaw = item.item_data || item.data || '';
-          const details = String(detailsRaw).split('||').filter(Boolean);
-          details.forEach(detail => {
-            itemLines.push(detail.trim());
-          });
-        });
-        
-        itemLines.push('', '━━━━━━━━━━━━━━━━━━━━');
-        const message2 = itemLines.join('\n');
+        const message2 = formatDigitalItems(items);
         
         // Kirim pesan 2
         await telegram.sendMessage(order.chatId, message2, { parse_mode: 'Markdown' });
@@ -348,18 +316,11 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
 
     const uniqueNotes = [...new Set(itemNotes)];
     if (uniqueNotes.length > 0) {
-      const noteLines = [
-        '📝 *Catatan Produk:*',
-        '━━━━━━━━━━━━━━━━━━━━',
-        '',
-        ...uniqueNotes.map((note, idx) => (
-          uniqueNotes.length > 1 ? `${idx + 1}. ${escapeMarkdown(note)}` : escapeMarkdown(note)
-        )),
-        '',
-        '━━━━━━━━━━━━━━━━━━━━'
-      ];
-
-      await telegram.sendMessage(order.chatId, noteLines.join('\n'), { parse_mode: 'Markdown' });
+      // Escape markdown untuk notes
+      const escapedNotes = uniqueNotes.map(note => escapeMarkdown(note));
+      const message25 = formatProductNotes(escapedNotes);
+      
+      await telegram.sendMessage(order.chatId, message25, { parse_mode: 'Markdown' });
 
       // Spacer sebelum pesan berikutnya
       await new Promise(resolve => setTimeout(resolve, 600));
@@ -368,31 +329,10 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
     // ============================================
     // PESAN 3: TEMPLATE AKHIR & UCAPAN TERIMA KASIH
     // ============================================
-    const message3Lines = [
-      '',
-      '✨ *Terima Kasih Sudah Berbelanja!*',
-      '',
-      '',
-      '⭐️ *Simpan pesanan ini sebagai bukti pembelian*',
-      '',
-    ];
-    
-    // Tambah catatan jika ada
-    if (finalizeResult?.after_msg) {
-      message3Lines.push('📌 *Catatan Penting:*');
-      message3Lines.push(finalizeResult.after_msg);
-      message3Lines.push('');
-    }
-    
-    // Tambah contact support
-    if (BOT_CONFIG.SUPPORT_CONTACT) {
-      message3Lines.push('━━━━━━━━━━━━━━━━━━━━');
-      message3Lines.push('');
-      message3Lines.push(`📞 *Butuh Bantuan?*`);
-      message3Lines.push(`Hubungi: ${BOT_CONFIG.SUPPORT_CONTACT}`);
-    }
-    
-    const message3 = message3Lines.join('\n');
+    const message3 = formatThankYou(
+      finalizeResult?.after_msg || null,
+      BOT_CONFIG.SUPPORT_CONTACT || null
+    );
     
     // Kirim pesan 3
     await telegram.sendMessage(order.chatId, message3, { parse_mode: 'Markdown' });

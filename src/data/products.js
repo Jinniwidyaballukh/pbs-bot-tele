@@ -102,7 +102,10 @@ export async function loadProducts(force = false) {
       kategori: p.kategori || '',
       harga: String(p.harga || '0'),
       harga_lama: p.harga_lama ? String(p.harga_lama) : '',
-      stok: String(p.stok || '0'),
+      // Use available_items count instead of static stok field
+      stok: String(p.available_items || p.stok || '0'),
+      available_items: p.available_items || 0,
+      total_items: p.total_items || 0,
       ikon: p.ikon || '',
       deskripsi: p.deskripsi || '',
       wa: p.wa || '',

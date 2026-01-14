@@ -5,20 +5,48 @@ import { supabase } from './supabase.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * Get all active products
+ * Get all active products with available item counts
  */
 export async function getAllProducts() {
   try {
-    const { data, error } = await supabase
+    const { data: products, error: prodError } = await supabase
       .from('products')
       .select('*')
       .eq('aktif', true)
       .order('kategori', { ascending: true })
       .order('nama', { ascending: true });
     
-    if (error) throw error;
+    if (prodError) throw prodError;
     
-    return data || [];
+    // Fetch available items count for each product
+    if (products && products.length > 0) {
+      const { data: itemCounts, error: itemError } = await supabase
+        .from('product_items')
+        .select('product_code, status', { count: 'exact' });
+      
+      if (!itemError && itemCounts) {
+        // Build map of code -> available count
+        const countsMap = new Map();
+        itemCounts.forEach((item) => {
+          const key = item.product_code;
+          if (!countsMap.has(key)) {
+            countsMap.set(key, { available: 0, total: 0 });
+          }
+          const counts = countsMap.get(key);
+          counts.total++;
+          if (item.status === 'available') counts.available++;
+        });
+        
+        // Add available count to products
+        return products.map(p => ({
+          ...p,
+          available_items: countsMap.get(p.kode)?.available || 0,
+          total_items: countsMap.get(p.kode)?.total || 0,
+        }));
+      }
+    }
+    
+    return products || [];
   } catch (error) {
     logger.error('Failed to get products:', { error: error.message });
     throw error;

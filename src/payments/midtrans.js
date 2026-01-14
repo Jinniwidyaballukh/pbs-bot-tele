@@ -139,13 +139,27 @@ export async function createMidtransQRISCharge({ order_id, gross_amount }) {
 /* =========================
    Signature Verification
    ========================= */
-export function verifyMidtransSignature({ order_id, status_code, gross_amount, signature_key }) {
-  const raw = String(order_id) + String(status_code) + String(gross_amount) + String(BOT_CONFIG.MIDTRANS_SERVER_KEY || '');
-  const calc = crypto.createHash('sha512').update(raw).digest('hex');
-  const isValid = calc === String(signature_key);
-  
-  logLine('Signature Verify:', { order_id, isValid });
-  
-  return isValid;
+export function verifyMidtransSignature({ order_id, status_code, gross_amount, server_key }) {
+  try {
+    // Midtrans signature format: SHA512(order_id + status_code + gross_amount + SERVER_KEY)
+    const serverKey = String(BOT_CONFIG.MIDTRANS_SERVER_KEY || '');
+    const raw = String(order_id) + String(status_code) + String(gross_amount) + serverKey;
+    const calc = crypto.createHash('sha512').update(raw).digest('hex');
+    const isValid = calc === String(server_key).toLowerCase();
+    
+    logLine('Signature Verify:', { order_id, calculated: calc.substring(0, 16), received: String(server_key).substring(0, 16), isValid });
+    
+    if (!isValid) {
+      logLine('[WARN] Signature mismatch!');
+      logLine('  Raw:', raw.substring(0, 50) + '...');
+      logLine('  Expected:', calc);
+      logLine('  Received:', String(server_key));
+    }
+    
+    return isValid;
+  } catch (error) {
+    logLine('[ERROR] Signature verification failed:', error.message);
+    return false;
+  }
 }
 

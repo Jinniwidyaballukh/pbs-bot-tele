@@ -20,20 +20,20 @@ export async function handleMidtransWebhook(req, res, telegram) {
     
     metrics.incCounter(MetricNames.WEBHOOK_RECEIVED, { type: 'midtrans' });
     
-    // Verify signature
-    const signature = req.get('x-signature') || req.get('X-Signature') || req.get('X-Midtrans-Signature-Key');
+    // Verify signature - Midtrans sends in X-Signature header
+    const signature = req.get('x-signature');
     
     if (!signature) {
-      logger.warn('[WEBHOOK] Missing signature', { correlationId, orderId: body.order_id });
+      logger.warn('[WEBHOOK] Missing X-Signature header', { correlationId, orderId: body.order_id });
       metrics.incCounter(MetricNames.WEBHOOK_ERRORS, { type: 'midtrans', error: 'missing_signature' });
-      return res.status(401).json({ error: 'Missing signature' });
+      return res.status(401).json({ error: 'Missing X-Signature header' });
     }
     
     if (!verifyMidtransSignature({
       order_id: body.order_id,
       status_code: body.status_code,
       gross_amount: body.gross_amount,
-      signature_key: signature,
+      server_key: signature,
     })) {
       logger.warn('[WEBHOOK] Invalid signature', { 
         correlationId, 

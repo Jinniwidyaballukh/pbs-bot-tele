@@ -15,10 +15,13 @@ ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 -- ============================================
 -- FIX ORDERS TABLE - ALLOW SERVICE ROLE
 -- ============================================
--- Drop policies yang strict
+-- Drop all old policies
 DROP POLICY IF EXISTS "orders_read_own" ON orders;
 DROP POLICY IF EXISTS "orders_insert_own" ON orders;
 DROP POLICY IF EXISTS "orders_manage_auth" ON orders;
+DROP POLICY IF EXISTS "orders_read_all" ON orders;
+DROP POLICY IF EXISTS "orders_insert_auth" ON orders;
+DROP POLICY IF EXISTS "orders_update_auth" ON orders;
 
 -- Create new permissive policies
 -- For SELECT: Allow authenticated users to read all
@@ -40,9 +43,12 @@ CREATE POLICY "orders_update_auth" ON orders
 -- ============================================
 -- FIX ORDER_ITEMS TABLE - ALLOW SERVICE ROLE
 -- ============================================
--- Drop strict policies
+-- Drop all old policies
 DROP POLICY IF EXISTS "order_items_read_own" ON order_items;
 DROP POLICY IF EXISTS "order_items_manage_auth" ON order_items;
+DROP POLICY IF EXISTS "order_items_read_all" ON order_items;
+DROP POLICY IF EXISTS "order_items_insert_auth" ON order_items;
+DROP POLICY IF EXISTS "order_items_update_auth" ON order_items;
 
 -- Create permissive policies
 CREATE POLICY "order_items_read_all" ON order_items
@@ -61,9 +67,12 @@ CREATE POLICY "order_items_update_auth" ON order_items
 -- ============================================
 -- FIX PRODUCTS TABLE
 -- ============================================
--- Keep read policy but fix write
+-- Drop all old policies
 DROP POLICY IF EXISTS "products_read_active" ON products;
 DROP POLICY IF EXISTS "products_manage_auth" ON products;
+DROP POLICY IF EXISTS "products_write_auth" ON products;
+DROP POLICY IF EXISTS "products_update_auth" ON products;
+DROP POLICY IF EXISTS "products_delete_auth" ON products;
 
 -- Read: Active products only
 CREATE POLICY "products_read_active" ON products
@@ -87,8 +96,13 @@ CREATE POLICY "products_delete_auth" ON products
 -- ============================================
 -- FIX PRODUCT_ITEMS TABLE
 -- ============================================
+-- Drop all old policies
 DROP POLICY IF EXISTS "product_items_read_available" ON product_items;
 DROP POLICY IF EXISTS "product_items_manage_auth" ON product_items;
+DROP POLICY IF EXISTS "product_items_read_all" ON product_items;
+DROP POLICY IF EXISTS "product_items_write_auth" ON product_items;
+DROP POLICY IF EXISTS "product_items_update_auth" ON product_items;
+DROP POLICY IF EXISTS "product_items_delete_auth" ON product_items;
 
 -- Read: All items (status will be filtered in app)
 CREATE POLICY "product_items_read_all" ON product_items

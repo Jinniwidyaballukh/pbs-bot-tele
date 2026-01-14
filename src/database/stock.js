@@ -61,6 +61,28 @@ export async function finalizeStock({ order_id, total, user_id }) {
     // Log items detail untuk debugging
     if (result.items && result.items.length > 0) {
       logger.info(`Items finalized: ${result.items.length}`, { items: result.items });
+
+      // Enrich items dengan notes agar bisa dikirim ke user
+      const itemIds = result.items
+        .map((it) => it.id)
+        .filter(Boolean);
+
+      if (itemIds.length > 0) {
+        const { data: noteRows, error } = await supabase
+          .from('product_items')
+          .select('id, notes')
+          .in('id', itemIds);
+
+        if (error) {
+          logger.warn('Failed to fetch item notes:', { order_id, error: error.message });
+        } else {
+          const notesMap = new Map((noteRows || []).map((row) => [row.id, row.notes || '' ]));
+          result.items = result.items.map((it) => ({
+            ...it,
+            notes: notesMap.get(it.id) || '',
+          }));
+        }
+      }
     } else {
       logger.warn('⚠️ Finalize returned empty items array!');
     }

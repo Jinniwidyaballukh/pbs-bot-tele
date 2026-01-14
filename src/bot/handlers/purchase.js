@@ -223,6 +223,8 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
     console.warn(`[PAYMENT SUCCESS] Order ${orderId} not found in memory`);
     return;
   }
+
+  const escapeMarkdown = (text = '') => text.replace(/([_*`])/g, '\\$1');
   
   try {
     console.log(`[PAYMENT SUCCESS] ✅ Processing payment untuk ${orderId}`);
@@ -334,6 +336,32 @@ export async function handlePaymentSuccess(telegram, orderId, paymentData = null
       
       // Delay 1000ms sebelum pesan 3
       await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // ============================================
+    // PESAN 2.5: CATATAN ITEM (JIKA ADA)
+    // ============================================
+    const itemNotes = (finalizeResult?.items || [])
+      .map((item) => (item.notes || '').trim())
+      .filter(Boolean);
+
+    const uniqueNotes = [...new Set(itemNotes)];
+    if (uniqueNotes.length > 0) {
+      const noteLines = [
+        '📝 *Catatan Produk:*',
+        '━━━━━━━━━━━━━━━━━━━━',
+        '',
+        ...uniqueNotes.map((note, idx) => (
+          uniqueNotes.length > 1 ? `${idx + 1}. ${escapeMarkdown(note)}` : escapeMarkdown(note)
+        )),
+        '',
+        '━━━━━━━━━━━━━━━━━━━━'
+      ];
+
+      await telegram.sendMessage(order.chatId, noteLines.join('\n'), { parse_mode: 'Markdown' });
+
+      // Spacer sebelum pesan berikutnya
+      await new Promise(resolve => setTimeout(resolve, 600));
     }
     
     // ============================================

@@ -35,7 +35,8 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createBrowserClient()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -52,7 +53,28 @@ export default function DashboardLayout({
     }
 
     getUser()
+
+    // Handle mobile detection
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false)
+      } else {
+        setSidebarOpen(true)
+      }
+    }
+
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  const handleNavClick = () => {
+    // Auto close sidebar on mobile when clicking a menu item
+    if (isMobile && sidebarOpen) {
+      setSidebarOpen(false)
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -77,10 +99,20 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Mobile Overlay */}
+      {isMobile && sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside className={`${
-        sidebarOpen ? 'w-64' : 'w-20'
-      } bg-gray-900 text-white transition-all duration-300 flex flex-col fixed h-screen z-20 left-0 top-0`}>
+        sidebarOpen ? 'w-64' : isMobile ? '-translate-x-full w-64' : 'w-20'
+      } bg-gray-900 text-white transition-all duration-300 flex flex-col fixed h-screen ${
+        isMobile ? 'z-40' : 'z-20'
+      } left-0 top-0`}>
         
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-800">
@@ -102,6 +134,7 @@ export default function DashboardLayout({
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={handleNavClick}
                 className={`flex items-center gap-3 px-4 py-2 rounded-lg transition ${
                   isActive
                     ? 'bg-indigo-600 text-white'
@@ -136,18 +169,26 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <main className={`${
-        sidebarOpen ? 'ml-64' : 'ml-20'
+        isMobile ? 'ml-0' : (sidebarOpen ? 'ml-64' : 'ml-20')
       } flex-1 overflow-auto transition-all duration-300`}>
         
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center px-8">
-          <h1 className="text-lg font-semibold text-gray-900">
+        <header className="bg-white border-b border-gray-200 h-16 flex items-center px-4 md:px-8">
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition"
+            >
+              <FiMenu className="text-xl text-gray-700" />
+            </button>
+          )}
+          <h1 className="text-base md:text-lg font-semibold text-gray-900">
             {navItems.find(item => item.href === pathname || pathname.startsWith(item.href + '/'))?.name || 'Dashboard'}
           </h1>
         </header>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="p-4 md:p-6 lg:p-8">
           {children}
         </div>
       </main>

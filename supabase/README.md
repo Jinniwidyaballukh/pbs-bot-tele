@@ -13,11 +13,13 @@ Copy-paste isi file tersebut ke SQL Editor dan klik **Run**.
 
 Setelah migration berhasil, cek di **Table Editor**. Anda harus melihat:
 - ✅ products
+- ✅ product_items (added in migration 002)
 - ✅ users
 - ✅ orders
 - ✅ order_items
 - ✅ stock_reservations
 - ✅ favorites
+- ✅ settings (added in migration 005)
 - ✅ analytics_product_views
 - ✅ analytics_searches
 - ✅ analytics_daily_stats

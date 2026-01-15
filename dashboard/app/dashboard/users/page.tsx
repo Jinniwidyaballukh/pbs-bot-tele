@@ -52,21 +52,21 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+      <h1 className="text-xl md:text-2xl font-bold text-gray-900">Users</h1>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-gray-600 text-sm font-medium">Total Users</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{users.length}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6">
+          <p className="text-gray-600 text-xs md:text-sm font-medium">Total Users</p>
+          <p className="text-2xl md:text-3xl font-bold text-gray-900 mt-1 md:mt-2">{users.length}</p>
         </div>
-        <div className="bg-blue-50 rounded-lg shadow p-6 border border-blue-200">
-          <p className="text-blue-700 text-sm font-medium">Active Users (30d)</p>
-          <p className="text-3xl font-bold text-blue-600 mt-2">0</p>
+        <div className="bg-blue-50 rounded-lg shadow p-4 md:p-6 border border-blue-200">
+          <p className="text-blue-700 text-xs md:text-sm font-medium">Active Users (30d)</p>
+          <p className="text-2xl md:text-3xl font-bold text-blue-600 mt-1 md:mt-2">0</p>
         </div>
-        <div className="bg-green-50 rounded-lg shadow p-6 border border-green-200">
-          <p className="text-green-700 text-sm font-medium">Total Purchases</p>
-          <p className="text-3xl font-bold text-green-600 mt-2">0</p>
+        <div className="bg-green-50 rounded-lg shadow p-4 md:p-6 border border-green-200">
+          <p className="text-green-700 text-xs md:text-sm font-medium">Total Purchases</p>
+          <p className="text-2xl md:text-3xl font-bold text-green-600 mt-1 md:mt-2">0</p>
         </div>
       </div>
 
@@ -99,39 +99,74 @@ export default function UsersPage() {
             </div>
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-6 py-3 font-semibold text-gray-900">Name</th>
-                <th className="text-left px-6 py-3 font-semibold text-gray-900">User ID</th>
-                <th className="text-left px-6 py-3 font-semibold text-gray-900">Username</th>
-                <th className="text-left px-6 py-3 font-semibold text-gray-900">Language</th>
-                <th className="text-left px-6 py-3 font-semibold text-gray-900">Last Activity</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-900">Name</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-900">User ID</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-900">Username</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-900">Language</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-900">Last Activity</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredUsers.map((user) => (
+                    <tr key={user.user_id} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-3">
+                        <p className="font-medium text-gray-900">{user.first_name || ''} {user.last_name || ''}</p>
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className="font-mono text-sm text-gray-600">{user.user_id}</span>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600">{user.username || '-'}</td>
+                      <td className="px-6 py-3 text-sm text-gray-600">{user.language || '-'}</td>
+                      <td className="px-6 py-3 text-sm text-gray-600">{user.last_activity ? new Date(user.last_activity).toLocaleString('id-ID') : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-gray-200">
               {filteredUsers.map((user) => (
-                <tr key={user.user_id} className="hover:bg-gray-50 transition">
-                  <td className="px-6 py-3">
-                    <p className="font-medium text-gray-900">{user.first_name || ''} {user.last_name || ''}</p>
-                  </td>
-                  <td className="px-6 py-3">
-                    <span className="font-mono text-sm text-gray-600">{user.user_id}</span>
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-600">{user.username || '-'}</td>
-                  <td className="px-6 py-3 text-sm text-gray-600">{user.language || '-'}</td>
-                  <td className="px-6 py-3 text-sm text-gray-600">{user.last_activity ? new Date(user.last_activity).toLocaleString('id-ID') : '-'}</td>
-                </tr>
+                <div key={user.user_id} className="p-4 hover:bg-gray-50">
+                  <div className="mb-2">
+                    <p className="font-medium text-gray-900 text-base">
+                      {user.first_name || ''} {user.last_name || ''}
+                    </p>
+                    <p className="text-xs text-gray-500 font-mono mt-1">{user.user_id}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                    <div>
+                      <span className="text-gray-500 text-xs">Username:</span>
+                      <p className="text-gray-700">{user.username || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 text-xs">Language:</span>
+                      <p className="text-gray-700">{user.language || '-'}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-gray-500 text-xs">Last Activity:</span>
+                    <p className="text-gray-600 text-sm">
+                      {user.last_activity ? new Date(user.last_activity).toLocaleString('id-ID') : '-'}
+                    </p>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 
       {/* Integration Guide */}
-      <div className="bg-linear-to-r from-indigo-50 to-blue-50 rounded-lg shadow p-6 border border-indigo-200">
-        <h3 className="text-lg font-bold text-indigo-900 mb-3">👥 User Tracking Setup</h3>
-        <p className="text-indigo-800 text-sm mb-3">
+      <div className="bg-linear-to-r from-indigo-50 to-blue-50 rounded-lg shadow p-4 md:p-6 border border-indigo-200">
+        <h3 className="text-base md:text-lg font-bold text-indigo-900 mb-2 md:mb-3">👥 User Tracking Setup</h3>
+        <p className="text-indigo-800 text-xs md:text-sm mb-2 md:mb-3">
           To enable user tracking in this dashboard, ensure your Telegram bot is configured to store user data in Supabase.
         </p>
         <div className="bg-white rounded p-3 text-xs text-gray-700 font-mono">

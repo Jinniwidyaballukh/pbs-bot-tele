@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@/lib/supabase'
-import { FiPlus, FiTrash2, FiSearch, FiX, FiCopy, FiCheck } from 'react-icons/fi'
+import { FiPlus, FiTrash2, FiSearch, FiX, FiCopy, FiCheck, FiDownload, FiCheckSquare, FiSquare, FiArrowDown } from 'react-icons/fi'
 import type { Database } from '@/lib/database.types'
 
 type Product = Database['public']['Tables']['products']['Row']
 type ProductItem = Database['public']['Tables']['product_items']['Row']
+
+type SortOption = 'recent' | 'oldest' | 'available' | 'sold' | 'reserved'
 
 export default function ProductItemsPage() {
   const supabase = createBrowserClient()
@@ -22,6 +24,8 @@ export default function ProductItemsPage() {
   const [batchName, setBatchName] = useState('')
   const [itemNotes, setItemNotes] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+  const [sortBy, setSortBy] = useState<SortOption>('recent')
 
   useEffect(() => {
     fetchProducts()
@@ -66,6 +70,107 @@ export default function ProductItemsPage() {
     } catch (error) {
       console.error('Error fetching items:', error)
     }
+  }
+
+  const toggleSelectItem = (itemId: string) => {
+    const newSelected = new Set(selectedItems)
+    if (newSelected.has(itemId)) {
+      newSelected.delete(itemId)
+    } else {
+      newSelected.add(itemId)
+    }
+    setSelectedItems(newSelected)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === filteredItems.length) {
+      setSelectedItems(new Set())
+    } else {
+      setSelectedItems(new Set(filteredItems.map(i => i.id)))
+    }
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedItems.size === 0) return
+
+    const availableItemsSelected = Array.from(selectedItems).filter(id => {
+      const item = items.find(i => i.id === id)
+      return item?.status === 'available'
+    })
+
+    if (availableItemsSelected.length === 0) {
+      alert('Only available items can be deleted. Selected items are not available.')
+      return
+    }
+
+    if (!confirm(`Are you sure you want to delete ${availableItemsSelected.length} available item(s)?`)) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('product_items')
+        .delete()
+        .in('id', availableItemsSelected)
+
+      if (error) throw error
+
+      alert(`Successfully deleted ${availableItemsSelected.length} item(s)`)
+      setSelectedItems(new Set())
+      fetchItems(selectedProduct)
+    } catch (error) {
+      console.error('Error batch deleting:', error)
+      alert('Error deleting items')
+    }
+  }
+
+  const exportToCSV = () => {
+    const itemsToExport = items.filter(i => selectedItems.size === 0 || selectedItems.has(i.id))
+    if (itemsToExport.length === 0) {
+      alert('No items to export')
+      return
+    }
+
+    const headers = ['Product Code', 'Item Data', 'Status', 'Batch', 'Notes', 'Created At']
+    const rows = itemsToExport.map(i => [
+      i.product_code,
+      i.item_data,
+      i.status,
+      i.batch || '',
+      i.notes || '',
+      new Date(i.created_at).toLocaleString('id-ID')
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    downloadFile(csvContent, `items_${selectedProduct}.csv`, 'text/csv')
+  }
+
+  const exportToTXT = () => {
+    const itemsToExport = items.filter(i => selectedItems.size === 0 || selectedItems.has(i.id))
+    if (itemsToExport.length === 0) {
+      alert('No items to export')
+      return
+    }
+
+    // Simple format: one item per line
+    const txtContent = itemsToExport.map(i => i.item_data).join('\n')
+    downloadFile(txtContent, `items_${selectedProduct}.txt`, 'text/plain')
+  }
+
+  const downloadFile = (content: string, filename: string, type: string) => {
+    const blob = new Blob([content], { type })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   const handleAddItems = async (e: React.FormEvent) => {
@@ -149,6 +254,32 @@ export default function ProductItemsPage() {
       item.notes?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    switch (sortBy) {
+      case 'recent':
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'oldest':
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case 'available':
+        // Available first, then others
+        if (a.status === 'available' && b.status !== 'available') return -1
+        if (a.status !== 'available' && b.status === 'available') return 1
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'sold':
+        // Sold first, then others
+        if (a.status === 'sold' && b.status !== 'sold') return -1
+        if (a.status !== 'sold' && b.status === 'sold') return 1
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'reserved':
+        // Reserved first, then others
+        if (a.status === 'reserved' && b.status !== 'reserved') return -1
+        if (a.status !== 'reserved' && b.status === 'reserved') return 1
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      default:
+        return 0
+    }
+  })
+
   const selectedProductData = products.find(p => p.kode === selectedProduct)
   const availableCount = items.filter(i => i.status === 'available').length
   const reservedCount = items.filter(i => i.status === 'reserved').length
@@ -161,31 +292,34 @@ export default function ProductItemsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Product Items</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Product Items</h1>
+        <div className="flex flex-col sm:flex-row gap-2">
           <button
             onClick={() => setShowUploadModal(true)}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition"
+            className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition text-sm md:text-base"
           >
-            <FiPlus /> Upload Batch
+            <FiPlus /> <span className="whitespace-nowrap">Upload Batch</span>
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition"
+            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition text-sm md:text-base"
           >
-            <FiPlus /> Add Items
+            <FiPlus /> <span className="whitespace-nowrap">Add Items</span>
           </button>
         </div>
       </div>
 
       {/* Product Selector */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Select Product</label>
+      <div className="bg-white rounded-lg shadow p-4 md:p-6">
+        <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">Select Product</label>
         <select
           value={selectedProduct}
-          onChange={(e) => setSelectedProduct(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          onChange={(e) => {
+            setSelectedProduct(e.target.value)
+            setSelectedItems(new Set())
+          }}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm md:text-base"
         >
           {products.map(product => (
             <option key={product.id} value={product.kode}>
@@ -195,112 +329,289 @@ export default function ProductItemsPage() {
         </select>
       </div>
 
-      {/* Stats */}
-      {selectedProductData && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-600">Total Items</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{items.length}</p>
-          </div>
-          <div className="bg-green-50 rounded-lg shadow p-4 border border-green-200">
-            <p className="text-sm text-green-700 font-medium">Available</p>
-            <p className="text-2xl font-bold text-green-600 mt-1">{availableCount}</p>
-          </div>
-          <div className="bg-yellow-50 rounded-lg shadow p-4 border border-yellow-200">
-            <p className="text-sm text-yellow-700 font-medium">Reserved</p>
-            <p className="text-2xl font-bold text-yellow-600 mt-1">{reservedCount}</p>
-          </div>
-          <div className="bg-blue-50 rounded-lg shadow p-4 border border-blue-200">
-            <p className="text-sm text-blue-700 font-medium">Sold</p>
-            <p className="text-2xl font-bold text-blue-600 mt-1">{soldCount}</p>
+      {/* Batch Actions */}
+      {selectedItems.size > 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 md:p-6 space-y-3">
+          <p className="text-indigo-900 font-semibold text-sm md:text-base">
+            ✓ {selectedItems.size} item(s) selected
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedItems(new Set())}
+              className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg transition text-sm font-medium border border-gray-300"
+            >
+              <FiX size={16} /> Clear
+            </button>
+            <button
+              onClick={exportToCSV}
+              className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium"
+            >
+              <FiDownload size={16} /> Export CSV
+            </button>
+            <button
+              onClick={exportToTXT}
+              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium"
+            >
+              <FiDownload size={16} /> Export TXT
+            </button>
+            <button
+              onClick={handleBatchDelete}
+              className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium"
+            >
+              <FiTrash2 size={16} /> Delete Available
+            </button>
           </div>
         </div>
       )}
 
-      {/* Search */}
+      {/* Export All Options & Search/Sort */}
       {items.length > 0 && (
-        <div className="relative">
-          <FiSearch className="absolute left-3 top-3 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search items..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 space-y-4">
+          {/* Export Options */}
+          {selectedItems.size === 0 && (
+            <div className="border-b border-gray-200 pb-4">
+              <p className="text-sm font-semibold text-gray-900 mb-3">Export All Items</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={exportToCSV}
+                  className="flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-4 py-2 rounded-lg transition text-sm font-medium"
+                >
+                  <FiDownload /> Export All to CSV
+                </button>
+                <button
+                  onClick={exportToTXT}
+                  className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-2 rounded-lg transition text-sm font-medium"
+                >
+                  <FiDownload /> Export All to TXT
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Search & Sort */}
+          <div>
+            <p className="text-sm font-semibold text-gray-900 mb-3">Search & Filter</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Search Input */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">Search Items</label>
+                <div className="relative">
+                  <FiSearch className="absolute left-3 top-2.5 text-gray-400 text-sm" />
+                  <input
+                    type="text"
+                    placeholder="Search items or notes..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Sort Dropdown */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2 flex items-center gap-1">
+                  <FiArrowDown size={14} /> Sort By
+                </label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                >
+                  <option value="recent">Recent (Newest First)</option>
+                  <option value="oldest">Oldest (Oldest First)</option>
+                  <option value="available">Available Items First</option>
+                  <option value="sold">Sold Items First</option>
+                  <option value="reserved">Reserved Items First</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Items List */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        {filteredItems.length === 0 ? (
+        {sortedItems.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             {items.length === 0
               ? 'No items for this product. Add your first item!'
               : 'No items match your search'}
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-6 py-3 font-semibold text-gray-900">Item Data</th>
-                <th className="text-left px-6 py-3 font-semibold text-gray-900">Status</th>
-                <th className="text-left px-6 py-3 font-semibold text-gray-900">Notes</th>
-                <th className="text-left px-6 py-3 font-semibold text-gray-900">Batch</th>
-                <th className="text-center px-6 py-3 font-semibold text-gray-900">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition">
-                  <td className="px-6 py-3">
-                    <div className="flex items-center justify-between group">
-                      <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-700 font-mono max-w-xs truncate">
-                        {item.item_data}
-                      </code>
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-4 py-3 w-12">
+                      <button
+                        onClick={toggleSelectAll}
+                        className="p-1 hover:bg-gray-200 rounded transition"
+                        title={selectedItems.size === sortedItems.length ? 'Deselect All' : 'Select All'}
+                      >
+                        {selectedItems.size === sortedItems.length ? (
+                          <FiCheckSquare className="text-indigo-600" size={18} />
+                        ) : (
+                          <FiSquare className="text-gray-400" size={18} />
+                        )}
+                      </button>
+                    </th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-900">Item Data</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-900">Status</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-900">Notes</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-900">Batch</th>
+                    <th className="text-center px-6 py-3 font-semibold text-gray-900">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {sortedItems.map((item) => (
+                    <tr key={item.id} className={`hover:bg-gray-50 transition ${
+                      selectedItems.has(item.id) ? 'bg-indigo-50' : ''
+                    }`}>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => toggleSelectItem(item.id)}
+                          className="p-1 hover:bg-gray-200 rounded transition"
+                        >
+                          {selectedItems.has(item.id) ? (
+                            <FiCheckSquare className="text-indigo-600" size={18} />
+                          ) : (
+                            <FiSquare className="text-gray-400" size={18} />
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center justify-between group">
+                          <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-700 font-mono max-w-xs truncate">
+                            {item.item_data}
+                          </code>
+                          <button
+                            onClick={() => handleCopyItem(item.item_data, item.id)}
+                            className="ml-2 p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition"
+                            title="Copy"
+                          >
+                            {copiedId === item.id ? <FiCheck /> : <FiCopy />}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                          item.status === 'available'
+                            ? 'bg-green-100 text-green-800'
+                            : item.status === 'reserved'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : item.status === 'sold'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600">
+                        {item.notes || '-'}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600">
+                        {item.batch || '-'}
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        {item.status === 'available' && (
+                          <button
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded transition"
+                            title="Delete"
+                          >
+                            <FiTrash2 />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-gray-200">
+              {sortedItems.map((item) => (
+                <div key={item.id} className={`p-4 hover:bg-gray-50 ${
+                  selectedItems.has(item.id) ? 'bg-indigo-50' : ''
+                }`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-start gap-3 flex-1">
+                      <button
+                        onClick={() => toggleSelectItem(item.id)}
+                        className="mt-1 p-1 hover:bg-gray-200 rounded transition"
+                      >
+                        {selectedItems.has(item.id) ? (
+                          <FiCheckSquare className="text-indigo-600" size={18} />
+                        ) : (
+                          <FiSquare className="text-gray-400" size={18} />
+                        )}
+                      </button>
+                      <div className="flex-1">
+                        <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700 font-mono break-all">
+                          {item.item_data}
+                        </code>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 ml-2">
                       <button
                         onClick={() => handleCopyItem(item.item_data, item.id)}
-                        className="ml-2 p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition"
+                        className="p-2 text-gray-400 hover:text-gray-600 transition"
                         title="Copy"
                       >
-                        {copiedId === item.id ? <FiCheck /> : <FiCopy />}
+                        {copiedId === item.id ? <FiCheck size={14} /> : <FiCopy size={14} />}
                       </button>
+                      {item.status === 'available' && (
+                        <button
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded transition"
+                          title="Delete"
+                        >
+                          <FiTrash2 size={14} />
+                        </button>
+                      )}
                     </div>
-                  </td>
-                  <td className="px-6 py-3">
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                      item.status === 'available'
-                        ? 'bg-green-100 text-green-800'
-                        : item.status === 'reserved'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : item.status === 'sold'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-600">
-                    {item.notes || '-'}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-600">
-                    {item.batch || '-'}
-                  </td>
-                  <td className="px-6 py-3 text-center">
-                    {item.status === 'available' && (
-                      <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded transition"
-                        title="Delete"
-                      >
-                        <FiTrash2 />
-                      </button>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <span className="text-gray-500 text-xs">Status:</span>
+                      <div className="mt-1">
+                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                          item.status === 'available'
+                            ? 'bg-green-100 text-green-800'
+                            : item.status === 'reserved'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : item.status === 'sold'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                    {(item.notes || item.batch) && (
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        {item.notes && (
+                          <div>
+                            <span className="text-gray-500 text-xs">Notes:</span>
+                            <p className="text-gray-700 text-xs">{item.notes}</p>
+                          </div>
+                        )}
+                        {item.batch && (
+                          <div>
+                            <span className="text-gray-500 text-xs">Batch:</span>
+                            <p className="text-gray-700 text-xs">{item.batch}</p>
+                          </div>
+                        )}
+                      </div>
                     )}
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 

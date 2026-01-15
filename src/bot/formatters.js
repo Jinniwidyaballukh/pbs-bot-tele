@@ -89,7 +89,7 @@ export function truncate(text, maxLength = 100) {
 }
 
 /**
- * Format product list (tanpa banner - banner dikirim terpisah sebagai photo)
+ * Format product list (untuk caption photo)
  * @param {Array} products - Array of products
  * @param {number} page - Current page
  * @param {number} perPage - Items per page
@@ -111,20 +111,13 @@ export function formatProductList(products, page, perPage, total) {
         ? Number(p.stok)
         : 0;
 
+    // Format dengan kurung siku: [1] NAMA [0]
     return `[${num}] ${name} [${stock}]`;
   });
 
   const list = items.length ? items : ['Tidak ada produk.'];
-  
-  // Create box dengan format baru (tanpa kurung di sekitar nomor di item)
-  const box = [];
-  box.push('─────────────────');
-  for (const item of list) {
-    box.push(`${item}`);
-  }
-  box.push('─────────────────');
 
-  return [header, '', box.join('\n')].join('\n');
+  return [header, ...list].join('\n');
 }
 
 /**

@@ -118,23 +118,51 @@ export async function handleMenu(ctx) {
   
   if (ctx.callbackQuery) {
     // Jika update dari callback query (pagination)
-    await ctx.editMessageText(text, { 
-      parse_mode: 'Markdown', 
-      ...keyboard,
-    });
-    await ctx.answerCbQuery();
-  } else {
-    // Jika reply baru, kirim banner foto terlebih dahulu
     if (bannerUrl) {
       try {
-        await ctx.replyWithPhoto(bannerUrl);
+        await ctx.editMessageMedia(
+          {
+            type: 'photo',
+            media: bannerUrl,
+            caption: text,
+            parse_mode: 'Markdown',
+          },
+          keyboard
+        );
       } catch (error) {
-        console.warn('[MENU] Failed to send banner photo:', error.message);
-        // Continue despite banner failure
+        // Jika edit media gagal, fallback ke edit text
+        console.warn('[MENU] Edit media failed, using text fallback:', error.message);
+        await ctx.editMessageText(text, { 
+          parse_mode: 'Markdown', 
+          ...keyboard,
+        });
       }
+    } else {
+      await ctx.editMessageText(text, { 
+        parse_mode: 'Markdown', 
+        ...keyboard,
+      });
     }
-    
-    await ctx.replyWithMarkdown(text, keyboard);
+    await ctx.answerCbQuery();
+  } else {
+    // Jika reply baru
+    if (bannerUrl) {
+      try {
+        // Kirim foto dengan caption (1 bubble)
+        await ctx.replyWithPhoto(bannerUrl, {
+          caption: text,
+          parse_mode: 'Markdown',
+          ...keyboard,
+        });
+      } catch (error) {
+        console.warn('[MENU] Failed to send banner photo with caption:', error.message);
+        // Fallback: kirim text biasa jika foto gagal
+        await ctx.replyWithMarkdown(text, keyboard);
+      }
+    } else {
+      // Jika tidak ada banner, kirim text biasa
+      await ctx.replyWithMarkdown(text, keyboard);
+    }
   }
 }
 

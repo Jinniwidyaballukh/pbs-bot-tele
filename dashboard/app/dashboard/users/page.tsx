@@ -39,11 +39,14 @@ export default function UsersPage() {
     }
   }
 
-  const filteredUsers = users.filter(user =>
-    (user.first_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (user.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (user.user_id || '').includes(searchQuery)
-  )
+  const filteredUsers = users.filter(user => {
+    const searchLower = searchQuery.toLowerCase()
+    return (
+      String(user.first_name || '').toLowerCase().includes(searchLower) ||
+      String(user.username || '').toLowerCase().includes(searchLower) ||
+      String(user.user_id || '').includes(searchQuery)
+    )
+  })
 
   if (loading) {
     return <div className="text-center py-8">Loading users...</div>

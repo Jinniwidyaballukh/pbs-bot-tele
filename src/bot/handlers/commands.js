@@ -221,12 +221,18 @@ export async function handleCategories(ctx) {
   const userId = ctx.from.id;
   
   if (!checkRateLimit(userId, BOT_CONFIG.USER_COOLDOWN_MS)) {
-    return ctx.answerCbQuery?.('⏳ Tunggu sebentar...') || ctx.reply('⏳ Tunggu sebentar...');
+    if (ctx.callbackQuery) {
+      return ctx.answerCbQuery('⏳ Tunggu sebentar...');
+    }
+    return ctx.reply('⏳ Tunggu sebentar...');
   }
   
   const cats = categories();
   
   if (cats.length === 0) {
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery('❌ Belum ada kategori tersedia.');
+    }
     return ctx.reply('❌ Belum ada kategori tersedia.');
   }
   
@@ -234,11 +240,11 @@ export async function handleCategories(ctx) {
   const keyboard = categoryKeyboard(cats);
   
   if (ctx.callbackQuery) {
+    await ctx.answerCbQuery();
     await ctx.editMessageText(text, { 
       parse_mode: 'Markdown', 
       ...keyboard,
     });
-    await ctx.answerCbQuery();
   } else {
     await ctx.replyWithMarkdown(text, keyboard);
   }

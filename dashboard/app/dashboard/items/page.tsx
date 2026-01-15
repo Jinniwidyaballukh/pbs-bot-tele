@@ -26,6 +26,9 @@ export default function ProductItemsPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [sortBy, setSortBy] = useState<SortOption>('recent')
+  const [showStatusModal, setShowStatusModal] = useState(false)
+  const [statusChangeTarget, setStatusChangeTarget] = useState<string | null>(null)
+  const [newStatus, setNewStatus] = useState<'available' | 'sold'>('available')
 
   useEffect(() => {
     fetchProducts()
@@ -248,6 +251,54 @@ export default function ProductItemsPage() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
+  const handleStatusChange = async (itemId: string, currentStatus: string) => {
+    const newStat = currentStatus === 'available' ? 'sold' : 'available'
+    setStatusChangeTarget(itemId)
+    setNewStatus(newStat as any)
+    setShowStatusModal(true)
+  }
+
+  const handleBatchStatusChange = () => {
+    if (selectedItems.size === 0) {
+      alert('Please select items first')
+      return
+    }
+    setStatusChangeTarget('batch')
+    setShowStatusModal(true)
+  }
+
+  const confirmStatusChange = async () => {
+    try {
+      if (statusChangeTarget === 'batch') {
+        // Batch update
+        const { error } = await supabase
+          .from('product_items')
+          .update({ status: newStatus })
+          .in('id', Array.from(selectedItems))
+
+        if (error) throw error
+        alert(`Successfully updated ${selectedItems.size} item(s) to ${newStatus}`)
+        setSelectedItems(new Set())
+      } else if (statusChangeTarget) {
+        // Single update
+        const { error } = await supabase
+          .from('product_items')
+          .update({ status: newStatus })
+          .eq('id', statusChangeTarget)
+
+        if (error) throw error
+        alert(`Status updated to ${newStatus}`)
+      }
+
+      setShowStatusModal(false)
+      setStatusChangeTarget(null)
+      await fetchItems(selectedProduct)
+    } catch (error) {
+      console.error('Error updating status:', error)
+      alert('Failed to update status')
+    }
+  }
+
   const filteredItems = items.filter(
     item =>
       item.item_data.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -353,6 +404,12 @@ export default function ProductItemsPage() {
               className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium"
             >
               <FiDownload size={16} /> Export TXT
+            </button>
+            <button
+              onClick={handleBatchStatusChange}
+              className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium"
+            >
+              Change Status
             </button>
             <button
               onClick={handleBatchDelete}
@@ -499,11 +556,7 @@ export default function ProductItemsPage() {
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
                           item.status === 'available'
                             ? 'bg-green-100 text-green-800'
-                            : item.status === 'reserved'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : item.status === 'sold'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-red-100 text-red-800'
+                            : 'bg-blue-100 text-blue-800'
                         }`}>
                           {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                         </span>
@@ -515,15 +568,37 @@ export default function ProductItemsPage() {
                         {item.batch || '-'}
                       </td>
                       <td className="px-6 py-3 text-center">
-                        {item.status === 'available' && (
+                        <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => handleDeleteItem(item.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded transition"
-                            title="Delete"
+                            onClick={() => handleStatusChange(item.id, item.status)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                              item.status === 'available'
+                                ? 'bg-green-600'
+                                : 'bg-blue-600'
+                            }`}
+                            title={`Toggle to ${item.status === 'available' ? 'Sold' : 'Available'}`}
                           >
-                            <FiTrash2 />
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                item.status === 'available' ? 'translate-x-1' : 'translate-x-6'
+                              }`}
+                            />
                           </button>
-                        )}
+                          <span className={`text-xs font-medium ${
+                            item.status === 'available' ? 'text-green-700' : 'text-blue-700'
+                          }`}>
+                            {item.status === 'available' ? 'Available' : 'Sold'}
+                          </span>
+                          {item.status === 'available' && (
+                            <button
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded transition"
+                              title="Delete"
+                            >
+                              <FiTrash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -577,17 +652,26 @@ export default function ProductItemsPage() {
                   <div className="mt-3 space-y-2">
                     <div>
                       <span className="text-gray-500 text-xs">Status:</span>
-                      <div className="mt-1">
-                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                          item.status === 'available'
-                            ? 'bg-green-100 text-green-800'
-                            : item.status === 'reserved'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : item.status === 'sold'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-red-100 text-red-800'
+                      <div className="mt-1 flex items-center gap-2">
+                        <button
+                          onClick={() => handleStatusChange(item.id, item.status)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                            item.status === 'available'
+                              ? 'bg-green-600'
+                              : 'bg-blue-600'
+                          }`}
+                          title={`Toggle to ${item.status === 'available' ? 'Sold' : 'Available'}`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              item.status === 'available' ? 'translate-x-1' : 'translate-x-6'
+                            }`}
+                          />
+                        </button>
+                        <span className={`text-xs font-medium ${
+                          item.status === 'available' ? 'text-green-700' : 'text-blue-700'
                         }`}>
-                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                          {item.status === 'available' ? 'Available' : 'Sold'}
                         </span>
                       </div>
                     </div>
@@ -814,6 +898,86 @@ export default function ProductItemsPage() {
               {uploadError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{uploadError}</div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status Change Confirmation Modal */}
+      {showStatusModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">
+                {statusChangeTarget === 'batch' ? 'Change Status (Batch)' : 'Change Item Status'}
+              </h3>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-600">
+                {statusChangeTarget === 'batch' 
+                  ? `Change status for ${selectedItems.size} selected item(s)`
+                  : 'Change status for this item'}
+              </p>
+              
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 mb-1">New Status</p>
+                    <p className="text-xs text-gray-600">Toggle between available and sold</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-sm font-medium ${
+                      newStatus === 'available' ? 'text-green-700' : 'text-gray-400'
+                    }`}>
+                      Available
+                    </span>
+                    <button
+                      onClick={() => setNewStatus(newStatus === 'available' ? 'sold' : 'available')}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                        newStatus === 'available'
+                          ? 'bg-green-600'
+                          : 'bg-blue-600'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                          newStatus === 'available' ? 'translate-x-1' : 'translate-x-7'
+                        }`}
+                      />
+                    </button>
+                    <span className={`text-sm font-medium ${
+                      newStatus === 'sold' ? 'text-blue-700' : 'text-gray-400'
+                    }`}>
+                      Sold
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-xs text-yellow-800">
+                  <strong>Note:</strong> This will immediately update the status of {statusChangeTarget === 'batch' ? `${selectedItems.size} item(s)` : 'the selected item'}.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowStatusModal(false)
+                  setStatusChangeTarget(null)
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmStatusChange}
+                className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition"
+              >
+                Confirm Change
+              </button>
             </div>
           </div>
         </div>

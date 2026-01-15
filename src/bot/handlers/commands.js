@@ -111,7 +111,7 @@ export async function handleMenu(ctx) {
   const start = (page - 1) * perPage;
   const pageProducts = products.slice(start, start + perPage);
   
-  const text = formatProductList(pageProducts, page, perPage, products.length);
+  const text = formatProductList(pageProducts, page, perPage, products.length, BOT_CONFIG.CATALOG_BANNER_URL);
   const keyboard = productGridKeyboard(products.length, page, perPage);
   
   if (ctx.callbackQuery) {

@@ -58,6 +58,7 @@ export const BOT_CONFIG = {
   STORE_NAME: process.env.STORE_NAME || 'PBS Digital Store',
   STORE_DESCRIPTION: process.env.STORE_DESCRIPTION || 'Toko Digital Terpercaya',
   SUPPORT_CONTACT: process.env.SUPPORT_CONTACT || '',
+  CATALOG_BANNER_URL: process.env.CATALOG_BANNER_URL || '', // Banner gambar katalog produk
   
   // Currency
   CURRENCY: process.env.CURRENCY || 'IDR',

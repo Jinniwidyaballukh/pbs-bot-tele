@@ -90,38 +90,48 @@ export function truncate(text, maxLength = 100) {
 
 /**
  * Format product list
+ * @param {Array} products - Array of products
+ * @param {number} page - Current page
+ * @param {number} perPage - Items per page
+ * @param {number} total - Total products
+ * @param {string} bannerUrl - Banner image URL (optional)
  */
-export function formatProductList(products, page, perPage, total) {
+export function formatProductList(products, page, perPage, total, bannerUrl = null) {
   const start = (page - 1) * perPage;
   const totalPages = Math.ceil(total / perPage);
 
-  const header = cardBlock([
-    kv('Toko', BOT_CONFIG.STORE_NAME),
-    kv('Judul', 'KATALOG PRODUK'),
-    kv('Halaman', `${page}/${totalPages}`),
-    kv('Total', `${total} produk`),
-  ]);
+  // Build header with banner or store name
+  const header = bannerUrl 
+    ? `🖼️ [BANNER](${bannerUrl})`
+    : `${BOT_CONFIG.STORE_NAME}`;
 
   const items = products.map((p, i) => {
     const num = start + i + 1;
-    const name = String(p.nama || '');
-    const price = formatCurrency(p.harga);
+    const name = String(p.nama || '').toUpperCase();
 
     const stock =
       p.stok !== null && p.stok !== undefined && p.stok !== ''
-        ? Number(p.stok) > 0
-          ? `Stok: ${p.stok}`
-          : 'Stok: Habis'
-        : '';
+        ? Number(p.stok)
+        : 0;
 
-    return stock
-      ? `${num}. ${name} | ${price} | ${stock}`
-      : `${num}. ${name} | ${price}`;
+    return `[ ${num} ] ${name} [ ${stock} ]`;
   });
 
-  const list = items.length ? cardBlock(items) : cardBlock(['Tidak ada produk.']);
+  const list = items.length ? items : ['Tidak ada produk.'];
+  
+  // Create box with custom formatting
+  const box = [];
+  box.push('╭──────〔 LIST PRODUCT 〕─');
+  for (const item of list) {
+    box.push(`┊ ${item}`);
+  }
+  box.push('╰─────────────────╯');
 
-  return [header, list].join('\n');
+  const result = bannerUrl 
+    ? [header, '', box.join('\n')].join('\n')
+    : [header, box.join('\n')].join('\n');
+
+  return result;
 }
 
 /**

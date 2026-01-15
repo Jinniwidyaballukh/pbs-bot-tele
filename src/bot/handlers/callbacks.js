@@ -163,7 +163,8 @@ async function handleViewCallback(ctx, params) {
   const favorite = isFavorited(userId, product.kode);
   const keyboard = productDetailKeyboard(product.kode, quantity, favorite, originPage);
   
-  await ctx.editMessageText(text, {
+  // Kirim message baru untuk detail produk (karena katalog sekarang pakai photo)
+  await ctx.reply(text, {
     parse_mode: 'Markdown',
     ...keyboard,
   });

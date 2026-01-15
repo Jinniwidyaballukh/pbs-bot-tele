@@ -109,7 +109,7 @@ export default function DashboardLayout({
                 }`}
                 title={!sidebarOpen ? item.name : ''}
               >
-                <Icon className="flex-shrink-0 text-lg" />
+                <Icon className="shrink-0 text-lg" />
                 {sidebarOpen && <span className="text-sm font-medium">{item.name}</span>}
               </Link>
             )

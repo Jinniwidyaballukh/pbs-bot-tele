@@ -99,9 +99,6 @@ export function formatProductList(products, page, perPage, total) {
   const start = (page - 1) * perPage;
   const totalPages = Math.ceil(total / perPage);
 
-  // Header dengan nama toko dan info halaman
-  const header = `${BOT_CONFIG.STORE_NAME}\n📋 LIST PRODUK\npage ${page} / ${totalPages}`;
-
   const items = products.map((p, i) => {
     const num = start + i + 1;
     const name = String(p.nama || '').toUpperCase();
@@ -111,13 +108,24 @@ export function formatProductList(products, page, perPage, total) {
         ? Number(p.stok)
         : 0;
 
-    // Format dengan kurung siku: [1] NAMA [0]
-    return `[${num}] ${name} [${stock}]`;
+    // Format dengan kurung siku: [ 1 ] NAMA [ 20 ]
+    return `[ ${num} ] ${name} [ ${stock} ]`;
   });
 
   const list = items.length ? items : ['Tidak ada produk.'];
 
-  return [header, ...list].join('\n');
+  // Build box dengan outline
+  const box = [];
+  box.push('╭──────〔 LIST PRODUCT 〕─');
+  for (const item of list) {
+    box.push(`┊ ${item}`);
+  }
+  box.push('╰─────────────────╯');
+
+  // Header dengan nama toko dan info halaman
+  const header = `${BOT_CONFIG.STORE_NAME}\n📋 LIST PRODUK\npage ${page} / ${totalPages}`;
+
+  return [header, '', box.join('\n')].join('\n');
 }
 
 /**

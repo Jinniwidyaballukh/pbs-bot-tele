@@ -449,6 +449,7 @@ export default function OrderSuccess() {
                       // Split item_data by newline to show multiple items
                       const itemDataArray = item.item_data ? item.item_data.split('\n').filter(Boolean) : []
                       const expectedCount = item.quantity || 1
+                      const displayCount = itemDataArray.length > 0 ? itemDataArray.length : expectedCount
                       
                       return (
                         <div
@@ -462,13 +463,13 @@ export default function OrderSuccess() {
                                 Kode Produk: <span className="font-mono font-semibold">{item.product_code || item.id}</span>
                               </p>
                               <p className="text-sm text-gray-600 mt-1">
-                                Quantity: <span className="font-semibold text-green-700">{item.quantity}x</span> @ {formatPrice(item.price)}
+                                Quantity: <span className="font-semibold text-green-700">{displayCount}x</span> @ {formatPrice(item.price)}
                               </p>
                             </div>
                             <div className="text-right">
                               <p className="text-sm text-gray-500">Total</p>
                               <p className="font-bold text-xl text-green-600">
-                                {formatPrice(item.price * item.quantity)}
+                                {formatPrice(item.price * displayCount)}
                               </p>
                             </div>
                           </div>

@@ -1,5 +1,4 @@
-'use client'
-
+import { Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
@@ -26,7 +25,7 @@ interface OrderDetails {
   transactionTime?: string
 }
 
-export default function OrderSuccess() {
+function OrderSuccessInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const orderId = searchParams.get('orderId')
@@ -650,5 +649,13 @@ export default function OrderSuccess() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function OrderSuccessPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <OrderSuccessInner />
+    </Suspense>
   )
 }

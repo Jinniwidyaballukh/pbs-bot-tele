@@ -1,5 +1,4 @@
-'use client'
-
+import { Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import ProductCard from '@/components/ProductCard'
@@ -9,7 +8,7 @@ import { useSearchParams } from 'next/navigation'
 
 type Product = Database['public']['Tables']['products']['Row']
 
-export default function Home() {
+function HomeInner() {
   const searchParams = useSearchParams()
   const searchQuery = searchParams.get('search') || ''
   
@@ -580,5 +579,13 @@ export default function Home() {
         </div>
       </section>
     </>
+  )
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HomeInner />
+    </Suspense>
   )
 }

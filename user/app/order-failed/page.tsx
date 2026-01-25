@@ -1,10 +1,9 @@
-'use client'
-
+import { Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
-export default function OrderFailed() {
+function OrderFailedInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const orderId = searchParams.get('orderId')
@@ -193,5 +192,13 @@ export default function OrderFailed() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function OrderFailedPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <OrderFailedInner />
+    </Suspense>
   )
 }

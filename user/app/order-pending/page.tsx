@@ -1,11 +1,10 @@
-'use client'
-
+import { Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
-export default function OrderPending() {
+function OrderPendingInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const orderId = searchParams.get('orderId')
@@ -444,5 +443,13 @@ export default function OrderPending() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function OrderPendingPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <OrderPendingInner />
+    </Suspense>
   )
 }

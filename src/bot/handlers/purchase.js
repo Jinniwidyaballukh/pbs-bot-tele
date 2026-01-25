@@ -2,6 +2,9 @@
 import QRCode from 'qrcode';
 import { BOT_CONFIG } from '../config.js';
 import { ACTIVE_ORDERS, recordOrder, getUserSession } from '../state.js';
+
+// Map untuk menyimpan timer polling per orderId
+const ACTIVE_POLLING_TIMERS = new Map();
 import { formatProductDetail, formatPendingPayment, formatOrderReceipt, formatCurrency, formatDateTime, formatPaymentSuccess, formatDigitalItems, formatProductNotes, formatThankYou } from '../formatters.js';
 import { productDetailKeyboard, orderStatusKeyboard } from '../keyboards.js';
 import { byKode, getAll as getAllProducts } from '../../data/products.js';
@@ -154,7 +157,8 @@ export async function handlePurchase(ctx, productCode, quantity = 1) {
     });
     
     // Start polling for payment status (fallback)
-    pollPaymentStatus(ctx.telegram, orderId, product);
+    // Mulai polling dan simpan timer id
+    startPollingPaymentStatus(ctx.telegram, orderId, product);
     
   } catch (error) {
     console.error('[PURCHASE ERROR]', error);
@@ -172,46 +176,64 @@ export async function handlePurchase(ctx, productCode, quantity = 1) {
 /**
  * Poll payment status (fallback if webhook fails)
  */
-async function pollPaymentStatus(telegram, orderId, product, attempts = 0) {
+
+function startPollingPaymentStatus(telegram, orderId, product) {
   const maxAttempts = 20;
   const intervals = [5000, 10000, 15000, 30000]; // 5s, 10s, 15s, 30s intervals
-  
-  if (attempts >= maxAttempts) {
-    await handlePaymentTimeout(telegram, orderId);
-    return;
-  }
-  
-  // Wait before checking
-  const waitTime = intervals[Math.min(attempts, intervals.length - 1)];
-  await new Promise(resolve => setTimeout(resolve, waitTime));
-  
-  try {
-    const status = await midtransStatus(orderId);
-    const transactionStatus = (status.transaction_status || '').toLowerCase();
-    
-    console.log(`[POLL] ${orderId} - Attempt ${attempts + 1} - Status: ${transactionStatus}`);
-    
-    if (transactionStatus === 'settlement' || transactionStatus === 'capture') {
-      // Payment successful
-      await handlePaymentSuccess(telegram, orderId, status);
+  let attempts = 0;
+
+  async function poll() {
+    if (attempts >= maxAttempts) {
+      clearPollingTimer(orderId);
+      await handlePaymentTimeout(telegram, orderId);
       return;
     }
 
-    if (['expire', 'cancel', 'deny'].includes(transactionStatus)) {
-      // Payment failed
-      await handlePaymentFailed(telegram, orderId, transactionStatus);
-      return;
+    const waitTime = intervals[Math.min(attempts, intervals.length - 1)];
+    attempts++;
+    try {
+      const status = await midtransStatus(orderId);
+      const transactionStatus = (status.transaction_status || '').toLowerCase();
+      console.log(`[POLL] ${orderId} - Attempt ${attempts} - Status: ${transactionStatus}`);
+
+      // Cek status order di database sebelum memproses sukses
+      const { getOrder } = await import('../../database/orders.js');
+      let orderDb = null;
+      try {
+        orderDb = await getOrder(orderId);
+      } catch {}
+      const isAlreadyCompleted = orderDb && ['completed', 'paid', 'settlement', 'capture', 'success'].includes((orderDb.status || '').toLowerCase());
+
+      if ((transactionStatus === 'settlement' || transactionStatus === 'capture') && !isAlreadyCompleted) {
+        clearPollingTimer(orderId);
+        await handlePaymentSuccess(telegram, orderId, status);
+        return;
+      }
+
+      if (['expire', 'cancel', 'deny'].includes(transactionStatus)) {
+        clearPollingTimer(orderId);
+        await handlePaymentFailed(telegram, orderId, transactionStatus);
+        return;
+      }
+
+      // Schedule next poll
+      ACTIVE_POLLING_TIMERS.set(orderId, setTimeout(poll, waitTime));
+    } catch (error) {
+      console.error(`[POLL ERROR] ${orderId}:`, error);
+      // Schedule next poll even on error
+      ACTIVE_POLLING_TIMERS.set(orderId, setTimeout(poll, waitTime));
     }
-    
-    // Continue polling
-    pollPaymentStatus(telegram, orderId, product, attempts + 1);
-    
-  } catch (error) {
-    console.error(`[POLL ERROR] ${orderId}:`, error);
-    // Continue polling even on error
-    if (attempts < maxAttempts) {
-      pollPaymentStatus(telegram, orderId, product, attempts + 1);
-    }
+  }
+
+  // Start polling
+  ACTIVE_POLLING_TIMERS.set(orderId, setTimeout(poll, intervals[0]));
+}
+
+function clearPollingTimer(orderId) {
+  const timer = ACTIVE_POLLING_TIMERS.get(orderId);
+  if (timer) {
+    clearTimeout(timer);
+    ACTIVE_POLLING_TIMERS.delete(orderId);
   }
 }
 

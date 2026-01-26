@@ -106,8 +106,8 @@ export default function Header() {
             </div>
           </Link>
 
-          {/* Search Icon - Visible on all screens */}
-          <div className="flex items-center gap-2">
+          {/* Search Icon - Mobile only (tetap ada) */}
+          <div className="flex items-center gap-2 md:hidden">
             <button
               onClick={handleSearchClick}
               className={`px-3 py-2 rounded-full transition-all flex items-center gap-2 ${
@@ -163,6 +163,28 @@ export default function Header() {
                   {itemCount}
                 </span>
               )}
+            </Link>
+            <Link
+              href="/orders"
+              className={`px-4 py-2 rounded-full transition-all flex items-center gap-2 ${
+                pathname === '/orders'
+                  ? 'text-white bg-gradient-to-r from-[#5c63f2] to-[#7b5cf7] shadow-md'
+                  : 'text-[#1c2340] hover:text-[#5c63f2] hover:bg-[#eef0ff]'
+              }`}
+            >
+              <i className="fa-solid fa-receipt"></i>
+              Riwayat
+            </Link>
+            <Link
+              href="/profile"
+              className={`px-4 py-2 rounded-full transition-all flex items-center gap-2 ${
+                pathname === '/profile'
+                  ? 'text-white bg-gradient-to-r from-[#5c63f2] to-[#7b5cf7] shadow-md'
+                  : 'text-[#1c2340] hover:text-[#5c63f2] hover:bg-[#eef0ff]'
+              }`}
+            >
+              <i className="fa-solid fa-user"></i>
+              Profil
             </Link>
             </nav>
           </div>
